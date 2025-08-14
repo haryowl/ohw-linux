@@ -1,0 +1,66 @@
+{
+  "name": "galileosky-parser-windows",
+  "version": "1.3.0",
+  "description": "A comprehensive Windows application for parsing and managing Galileosky GPS tracking device data",
+  "main": "backend/src/server.js",
+  "scripts": {
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../mobile-frontend && npm install",
+    "start": "cd backend && npm start",
+    "start-backend": "cd backend && npm start",
+    "start-frontend": "cd frontend && npm start",
+    "start-mobile": "cd mobile-frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "build-mobile": "cd mobile-frontend && npm run build",
+    "dev": "concurrently \"npm run start-backend\" \"npm run start-frontend\"",
+    "dev-full": "concurrently \"npm run start-backend\" \"npm run start-frontend\" \"npm run start-mobile\"",
+    "test": "cd backend && npm test",
+    "test-parser": "cd backend && node run-parsing-tests.js",
+    "test-auth": "cd backend && node diagnose-auth-issues.js",
+    "fix-auth": "cd backend && node quick-fix-auth.js",
+    "fix-db": "cd backend && node fix-forwarded-column.js",
+    "deploy-dev": "cd backend && node deploy-config.js development && cd ../frontend && node deploy-config.js development",
+    "deploy-prod": "cd backend && node deploy-config.js production && cd ../frontend && node deploy-config.js production",
+    "deploy-current": "cd backend && node deploy-config.js current && cd ../frontend && node deploy-config.js current",
+    "setup-admin": "cd backend && node create-default-admin.js",
+    "clean": "cd frontend && Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue && cd ../mobile-frontend && Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue",
+    "pm2-start": "pm2 start ecosystem.config.js",
+    "pm2-stop": "pm2 stop ecosystem.config.js",
+    "pm2-restart": "pm2 restart ecosystem.config.js",
+    "pm2-logs": "pm2 logs",
+    "pm2-monit": "pm2 monit"
+  },
+  "keywords": [
+    "gps",
+    "tracking",
+    "galileosky",
+    "windows",
+    "nodejs",
+    "react",
+    "real-time",
+    "iot",
+    "telematics"
+  ],
+  "author": "haryowl",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/haryowl/WindowsGS.git"
+  },
+  "bugs": {
+    "url": "https://github.com/haryowl/WindowsGS/issues"
+  },
+  "homepage": "https://github.com/haryowl/WindowsGS#readme",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}

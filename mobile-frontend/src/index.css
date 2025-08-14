@@ -1,0 +1,189 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #f8fafc;
+    color: #1e293b;
+    overflow-x: hidden;
+  }
+  
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@layer components {
+  .mobile-container {
+    @apply max-w-md mx-auto bg-white min-h-screen;
+  }
+  
+  .mobile-header {
+    @apply sticky top-0 z-50 bg-white border-b border-gray-200 px-4 py-3;
+  }
+  
+  .mobile-content {
+    @apply flex-1 px-4 py-4;
+  }
+  
+  .mobile-bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50;
+  }
+  
+  .mobile-card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4;
+  }
+  
+  .mobile-button {
+    @apply w-full bg-primary-600 text-white font-medium py-3 px-4 rounded-lg 
+           hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 
+           focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed
+           transition-colors duration-200;
+  }
+  
+  .mobile-button-secondary {
+    @apply w-full bg-gray-100 text-gray-700 font-medium py-3 px-4 rounded-lg 
+           hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 
+           focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed
+           transition-colors duration-200;
+  }
+  
+  .mobile-input {
+    @apply w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none 
+           focus:ring-2 focus:ring-primary-500 focus:border-transparent
+           placeholder-gray-400 text-gray-900;
+  }
+  
+  .mobile-select {
+    @apply w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none 
+           focus:ring-2 focus:ring-primary-500 focus:border-transparent
+           bg-white text-gray-900;
+  }
+  
+  .mobile-nav-item {
+    @apply flex flex-col items-center justify-center py-2 px-3 text-xs font-medium
+           text-gray-500 hover:text-primary-600 transition-colors duration-200;
+  }
+  
+  .mobile-nav-item.active {
+    @apply text-primary-600;
+  }
+  
+  .mobile-nav-icon {
+    @apply w-6 h-6 mb-1;
+  }
+  
+  .mobile-status-indicator {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .mobile-status-online {
+    @apply bg-success-100 text-success-800;
+  }
+  
+  .mobile-status-offline {
+    @apply bg-gray-100 text-gray-800;
+  }
+  
+  .mobile-status-warning {
+    @apply bg-warning-100 text-warning-800;
+  }
+  
+  .mobile-status-error {
+    @apply bg-danger-100 text-danger-800;
+  }
+  
+  .mobile-loading {
+    @apply flex items-center justify-center py-8;
+  }
+  
+  .mobile-empty-state {
+    @apply text-center py-12 px-4;
+  }
+  
+  .mobile-empty-state-icon {
+    @apply w-16 h-16 mx-auto mb-4 text-gray-400;
+  }
+  
+  .mobile-empty-state-title {
+    @apply text-lg font-medium text-gray-900 mb-2;
+  }
+  
+  .mobile-empty-state-description {
+    @apply text-gray-500;
+  }
+}
+
+@layer utilities {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Map-specific styles */
+  .mobile-map-container {
+    @apply rounded-lg overflow-hidden;
+  }
+  
+  .mobile-map-container .leaflet-container {
+    @apply rounded-lg;
+  }
+  
+  .mobile-map-container .leaflet-control-zoom {
+    @apply border-0 shadow-lg;
+  }
+  
+  .mobile-map-container .leaflet-control-zoom a {
+    @apply bg-white text-gray-700 border border-gray-200 hover:bg-gray-50;
+  }
+  
+  .mobile-map-container .leaflet-popup-content-wrapper {
+    @apply rounded-lg shadow-lg border-0;
+  }
+  
+  .mobile-map-container .leaflet-popup-content {
+    @apply m-0 p-0;
+  }
+  
+  .mobile-map-container .leaflet-popup-tip {
+    @apply bg-white;
+  }
+  
+  .custom-device-marker {
+    @apply transition-transform duration-200;
+  }
+  
+  .custom-device-marker:hover {
+    @apply transform scale-110;
+  }
+} 

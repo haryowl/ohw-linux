@@ -1,0 +1,135 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x, 20.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd backend && npm ci
+        cd ../frontend && npm ci
+        cd ../mobile-frontend && npm ci
+    
+    - name: Run backend tests
+      run: |
+        cd backend
+        npm test
+      env:
+        NODE_ENV: test
+    
+    - name: Run parser tests
+      run: |
+        cd backend
+        node run-parsing-tests.js
+    
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+    
+    - name: Build mobile frontend
+      run: |
+        cd mobile-frontend
+        npm run build
+    
+    - name: Run linting
+      run: |
+        cd frontend
+        npm run lint
+        cd ../mobile-frontend
+        npm run lint
+
+  security:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run security audit
+      run: npm audit --audit-level moderate
+    
+    - name: Run backend security audit
+      run: |
+        cd backend
+        npm audit --audit-level moderate
+    
+    - name: Run frontend security audit
+      run: |
+        cd frontend
+        npm audit --audit-level moderate
+
+  build:
+    needs: [test, security]
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd backend && npm ci
+        cd ../frontend && npm ci
+        cd ../mobile-frontend && npm ci
+    
+    - name: Build production assets
+      run: |
+        cd frontend
+        npm run build
+        cd ../mobile-frontend
+        npm run build
+    
+    - name: Create release artifacts
+      run: |
+        mkdir -p dist
+        xcopy /E /I backend dist\backend
+        xcopy /E /I frontend\build dist\frontend
+        xcopy /E /I mobile-frontend\build dist\mobile-frontend
+        copy package.json dist\
+        copy ecosystem.config.js dist\
+        copy README.md dist\
+        copy LICENSE dist\
+        copy .gitignore dist\
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: galileosky-parser-windows
+        path: dist/
+        retention-days: 30 
