@@ -316,7 +316,7 @@ class GalileoskyParser extends EventEmitter {
                     }
                     searchOffset++;
                 }
-                
+
                 // Log the detected format
                 logger.info('Packet format detection:', {
                     connectionAddress,
