@@ -57,13 +57,41 @@ gali-parse/
 
 ## 🛠️ Installation
 
-### 1. Clone the Repository
+### 🚀 Quick Installation (Windows)
+
+**Easiest Method**: Download and run the automated installer:
+
+1. **Download installer**:
+   - [Download `install-windows.bat`](https://raw.githubusercontent.com/haryowl/WindowsGS/main/install-windows.bat)
+   - [Download `install-windows.ps1`](https://raw.githubusercontent.com/haryowl/WindowsGS/main/install-windows.ps1)
+
+2. **Run installer**:
+   - **Batch**: Right-click `install-windows.bat` → "Run as administrator"
+   - **PowerShell**: Right-click `install-windows.ps1` → "Run with PowerShell"
+
+3. **Wait for completion** (5-10 minutes)
+
+4. **Start application**: Double-click desktop shortcut or visit http://localhost:3002
+
+**Default Login**: `admin` / `admin123`
+
+📖 **Detailed Windows Installation Guide**: [WINDOWS_INSTALLATION.md](WINDOWS_INSTALLATION.md)
+
+### 🔧 Manual Installation
+
+#### Prerequisites
+- **Node.js** (v16 or higher): https://nodejs.org/
+- **Git**: https://git-scm.com/download/win
+
+#### Steps
+
+1. **Clone Repository**
 ```bash
 git clone https://github.com/haryowl/WindowsGS.git
 cd WindowsGS
 ```
 
-### 2. Install Dependencies
+2. **Install Dependencies**
 ```bash
 # Install root dependencies
 npm install
@@ -81,21 +109,18 @@ cd ../mobile-frontend
 npm install
 ```
 
-### 3. Configure Environment
-
-#### Backend Configuration
+3. **Configure Environment**
 ```bash
+# Backend configuration
 cd backend
 node deploy-config.js development
-```
 
-#### Frontend Configuration
-```bash
-cd frontend
+# Frontend configuration
+cd ../frontend
 node deploy-config.js development
 ```
 
-### 4. Initialize Database
+4. **Initialize Database**
 ```bash
 cd backend
 node create-default-admin.js
