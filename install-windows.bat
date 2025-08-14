@@ -131,14 +131,32 @@ call npm install
 echo [INFO] Installing backend dependencies...
 cd backend
 call npm install
+if %errorLevel% neq 0 (
+    echo [ERROR] Backend dependencies installation failed
+    echo [INFO] Retrying backend installation...
+    call npm cache clean --force
+    call npm install
+)
 
 echo [INFO] Installing frontend dependencies...
 cd ..\frontend
 call npm install
+if %errorLevel% neq 0 (
+    echo [ERROR] Frontend dependencies installation failed
+    echo [INFO] Retrying frontend installation...
+    call npm cache clean --force
+    call npm install
+)
 
 echo [INFO] Installing mobile frontend dependencies...
 cd ..\mobile-frontend
 call npm install
+if %errorLevel% neq 0 (
+    echo [ERROR] Mobile frontend dependencies installation failed
+    echo [INFO] Retrying mobile frontend installation...
+    call npm cache clean --force
+    call npm install
+)
 
 cd ..
 

@@ -128,6 +128,20 @@ The application is installed at:
    - Check internet connection for npm downloads
    - Try running `npm cache clean --force`
 
+6. **"Cannot find module 'cookie-parser'" or missing dependencies**
+   - **Quick Fix**: Download and run the dependency fix script:
+     - [Download `fix-dependencies.bat`](https://raw.githubusercontent.com/haryowl/WindowsGS/main/fix-dependencies.bat)
+     - [Download `fix-dependencies.ps1`](https://raw.githubusercontent.com/haryowl/WindowsGS/main/fix-dependencies.ps1)
+   - **Manual Fix**:
+     ```cmd
+     cd %USERPROFILE%\GalileoskyParser\WindowsGS
+     npm cache clean --force
+     npm install
+     cd backend && npm install
+     cd ..\frontend && npm install
+     cd ..\mobile-frontend && npm install
+     ```
+
 ### Manual Troubleshooting
 
 If the automated installer fails:
