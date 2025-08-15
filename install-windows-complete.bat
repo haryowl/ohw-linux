@@ -189,15 +189,9 @@ call node create-default-admin.js
 
 cd ..
 
-:: Step 7: Fix ESLint warnings and build frontend
-echo [STEP 7/8] Fixing ESLint warnings and building frontend application...
+:: Step 7: Build frontend
+echo [STEP 7/8] Building frontend application...
 cd frontend
-
-echo [INFO] Fixing ESLint warnings...
-cd ..
-call node fix-eslint-warnings.js
-cd frontend
-
 echo [INFO] Building frontend application...
 call npm run build
 if %errorLevel% neq 0 (

@@ -1,22 +1,7 @@
 // frontend/src/services/api.js
 
-// Dynamic API URL detection - works for both localhost and IP access
-function getApiBaseUrl() {
-  // Get the current frontend URL
-  const currentUrl = window.location.href;
-  
-  // If accessing from localhost, use localhost backend
-  if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
-    return 'http://localhost:3001';
-  }
-  
-  // If accessing from IP address, use the same IP for backend
-  const url = new URL(currentUrl);
-  return `http://${url.hostname}:3001`;
-}
-
-// Use dynamic API URL
-const API_BASE_URL = getApiBaseUrl();
+// API URL configuration
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 export const BASE_URL = API_BASE_URL;
 
