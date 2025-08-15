@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSnackbar } from 'notistack';
 import useWebSocket from '../hooks/useWebSocket';
-import { } from '../services/api';
+import { BASE_URL } from '../services/api';
 
 const DataContext = createContext(null);
 

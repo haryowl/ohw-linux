@@ -39,7 +39,7 @@ import {
   DirectionsCar as CarIcon,
   DirectionsBoat as ShipIcon
 } from '@mui/icons-material';
-import { useMapEvents } from 'react-leaflet';
+import { useMapEvents, Marker, Popup, Polyline } from 'react-leaflet';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -87,7 +87,7 @@ const Tracking = () => {
   const [currentReplayIndex, setCurrentReplayIndex] = useState(0);
   const [replayProgress, setReplayProgress] = useState(0);
   const replayIntervalRef = useRef(null);
-  // const [replayData, setReplayData] = useState([]);
+  const [replayData, setReplayData] = useState([]);
 
   // GPS icon customization
   const [gpsIconType, setGpsIconType] = useState('default');
@@ -281,23 +281,23 @@ const Tracking = () => {
   };
 
   // const fetchDeviceLocations = useCallback(async () => {
-    try {
-      const response = await fetch(`${BASE_URL}/api/devices/locations`, {
-        credentials: 'include' // Include cookies in the request
-      });
-      
-      if (response.ok) {
-        const locations = await response.json();
-        setDeviceLocations(locations);
-      } else {
-        console.error('Failed to fetch device locations:', response.status);
-        setDeviceLocations([]);
-      }
-    } catch (error) {
-      console.error('Error fetching device locations:', error);
-      setDeviceLocations([]);
-    }
-  };
+  //   try {
+  //     const response = await fetch(`${BASE_URL}/api/devices/locations`, {
+  //       credentials: 'include' // Include cookies in the request
+  //     });
+  //     
+  //     if (response.ok) {
+  //       const locations = await response.json();
+  //       setDeviceLocations(locations);
+  //     } else {
+  //       console.error('Failed to fetch device locations:', response.status);
+  //       setDeviceLocations([]);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching device locations:', error);
+  //     setDeviceLocations([]);
+  //   }
+  // };
 
   // Replay control functions
   const startReplay = () => {
@@ -395,7 +395,7 @@ const Tracking = () => {
       setMapCenter([getCurrentReplayPoint().latitude, getCurrentReplayPoint().longitude]);
       setMapZoom(15); // Zoom in during replay for better visibility
     }
-  }, [selectedDevices, mapCenter, zoomLevel, getCurrentReplayPoint]);
+  }, [isReplaying, getCurrentReplayPoint]);
 
   // Cleanup replay interval on unmount
   useEffect(() => {

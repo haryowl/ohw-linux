@@ -67,7 +67,7 @@ const Settings = () => {
     severity: 'success'
   });
 
-  // const [backups, setBackups] = useState([]);
+  const [backups, setBackups] = useState([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [backupDialogOpen, setBackupDialogOpen] = useState(false);
@@ -303,30 +303,30 @@ const Settings = () => {
   };
 
   // const handleRestoreBackup = async (backupFile) => {
-    try {
-      await authenticatedFetch(`${BASE_URL}/api/settings/backups/${backupId}/restore`, {
-        method: 'POST'
-      });
-      fetchSettings();
-      setSnackbar({ open: true, message: 'Settings restored successfully', severity: 'success' });
-    } catch (error) {
-      console.error('Error restoring backup:', error);
-      setSnackbar({ open: true, message: 'Error restoring backup', severity: 'error' });
-    }
-  };
+  //   try {
+  //     await authenticatedFetch(`${BASE_URL}/api/settings/backups/${backupId}/restore`, {
+  //       method: 'POST'
+  //     });
+  //     fetchSettings();
+  //     setSnackbar({ open: true, message: 'Settings restored successfully', severity: 'success' });
+  //   } catch (error) {
+  //     console.error('Error restoring backup:', error);
+  //     setSnackbar({ open: true, message: 'Error restoring backup', severity: 'error' });
+  //   }
+  // };
 
   // const handleDeleteBackup = async (backupFile) => {
-    try {
-      await authenticatedFetch(`${BASE_URL}/api/settings/backups/${backupId}`, {
-        method: 'DELETE'
-      });
-      fetchBackups();
-      setSnackbar({ open: true, message: 'Backup deleted successfully', severity: 'success' });
-    } catch (error) {
-      console.error('Error deleting backup:', error);
-      setSnackbar({ open: true, message: 'Error deleting backup', severity: 'error' });
-    }
-  };
+  //   try {
+  //     await authenticatedFetch(`${BASE_URL}/api/settings/backups/${backupId}`, {
+  //       method: 'DELETE'
+  //     });
+  //     fetchBackups();
+  //     setSnackbar({ open: true, message: 'Backup deleted successfully', severity: 'success' });
+  //   } catch (error) {
+  //     console.error('Error deleting backup:', error);
+  //     setSnackbar({ open: true, message: 'Error deleting backup', severity: 'error' });
+  //   }
+  // };
 
   const handleExportSettings = async () => {
     try {

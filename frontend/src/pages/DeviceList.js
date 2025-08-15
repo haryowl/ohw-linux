@@ -21,8 +21,7 @@ import {
 import { 
   LocationOn as LocationIcon, 
   Refresh as RefreshIcon,
-  Edit as EditIcon,
-  Info as InfoIcon
+  Edit as EditIcon
 } from '@mui/icons-material';
 import useWebSocket from '../hooks/useWebSocket';
 import { apiFetchDevices } from '../services/api';

@@ -229,10 +229,10 @@ const UserManagement = () => {
 
   // Helper functions
   // const getAuthHeaders = () => {
-    return {
-      'Content-Type': 'application/json'
-    };
-  }, []);
+  //   return {
+  //     'Content-Type': 'application/json'
+  //   };
+  // };
 
   // Define fetchUsers before loadData
   const fetchUsers = useCallback(async () => {
