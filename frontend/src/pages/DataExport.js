@@ -135,7 +135,7 @@ const DataExport = () => {
   useEffect(() => {
     fetchData();
     fetchAvailableImeis();
-  }, [startDate, endDate, selectedImeis]);
+  }, [selectedDevices, dateRange, format, fetchData]);
 
   const handleExport = async () => {
     try {

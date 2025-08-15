@@ -13,7 +13,7 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { authenticatedFetch } from '../services/api';
 
 const DeviceEditDialog = ({ open, device, onClose, onSave }) => {

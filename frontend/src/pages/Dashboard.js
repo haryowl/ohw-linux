@@ -1,10 +1,9 @@
 // frontend/src/pages/Dashboard.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Container,
   Grid,
-  Paper,
   Typography,
   Box,
   Card,
@@ -24,7 +23,6 @@ import {
   DeviceHub as DeviceIcon,
   Warning as AlertIcon,
   Storage as DataIcon,
-  TrendingUp as TrendIcon,
   AccessTime as TimeIcon,
   SignalCellular4Bar as SignalIcon,
   Speed as SpeedIcon,

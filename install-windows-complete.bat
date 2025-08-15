@@ -189,9 +189,16 @@ call node create-default-admin.js
 
 cd ..
 
-:: Step 7: Build frontend
-echo [STEP 7/8] Building frontend application...
+:: Step 7: Fix ESLint warnings and build frontend
+echo [STEP 7/8] Fixing ESLint warnings and building frontend application...
 cd frontend
+
+echo [INFO] Fixing ESLint warnings...
+cd ..
+call node fix-eslint-warnings.js
+cd frontend
+
+echo [INFO] Building frontend application...
 call npm run build
 if %errorLevel% neq 0 (
     echo [ERROR] Frontend build failed
@@ -230,14 +237,14 @@ echo [INFO] Creating desktop shortcut...
 set "DESKTOP=%USERPROFILE%\Desktop"
 set "SHORTCUT=%DESKTOP%\Galileosky Parser.lnk"
 
-powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k \"cd /d \"%PROJECT_DIR%\WindowsGS\" && echo Starting Galileosky Parser... && cd backend && npm start\"'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application'; $Shortcut.Save()}"
+powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k cd /d \"%PROJECT_DIR%\WindowsGS\" ^&^& echo Starting Galileosky Parser... ^&^& cd backend ^&^& npm start'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application'; $Shortcut.Save()}"
 
 :: Create start menu shortcut
 echo [INFO] Creating start menu shortcut...
 set "START_MENU=%APPDATA%\Microsoft\Windows\Start Menu\Programs"
 set "START_SHORTCUT=%START_MENU%\Galileosky Parser.lnk"
 
-powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%START_SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k \"cd /d \"%PROJECT_DIR%\WindowsGS\" && echo Starting Galileosky Parser... && cd backend && npm start\"'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application'; $Shortcut.Save()}"
+powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%START_SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k cd /d \"%PROJECT_DIR%\WindowsGS\" ^&^& echo Starting Galileosky Parser... ^&^& cd backend ^&^& npm start'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application'; $Shortcut.Save()}"
 
 :: Create uninstaller
 echo [INFO] Creating uninstaller...

@@ -39,7 +39,7 @@ import {
   DirectionsCar as CarIcon,
   DirectionsBoat as ShipIcon
 } from '@mui/icons-material';
-import { Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { useMapEvents } from 'react-leaflet';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -70,7 +70,7 @@ const Tracking = () => {
   const [mapZoom, setMapZoom] = useState(2);
   const [debugInfo, setDebugInfo] = useState('');
   const [mapType, setMapType] = useState('osm'); // 'osm', 'openseamap', 'satellite'
-  const [deviceLocations, setDeviceLocations] = useState([]);
+  // const [deviceLocations, setDeviceLocations] = useState({});
   const [filteringEnabled, setFilteringEnabled] = useState(true);
   const [filteringStats, setFilteringStats] = useState(null);
   const [filteringOptions, setFilteringOptions] = useState({
@@ -87,7 +87,7 @@ const Tracking = () => {
   const [currentReplayIndex, setCurrentReplayIndex] = useState(0);
   const [replayProgress, setReplayProgress] = useState(0);
   const replayIntervalRef = useRef(null);
-  const [replayData, setReplayData] = useState([]);
+  // const [replayData, setReplayData] = useState([]);
 
   // GPS icon customization
   const [gpsIconType, setGpsIconType] = useState('default');
@@ -280,7 +280,7 @@ const Tracking = () => {
     }
   };
 
-  const fetchDeviceLocations = async () => {
+  // const fetchDeviceLocations = useCallback(async () => {
     try {
       const response = await fetch(`${BASE_URL}/api/devices/locations`, {
         credentials: 'include' // Include cookies in the request
@@ -395,7 +395,7 @@ const Tracking = () => {
       setMapCenter([getCurrentReplayPoint().latitude, getCurrentReplayPoint().longitude]);
       setMapZoom(15); // Zoom in during replay for better visibility
     }
-  }, [currentReplayIndex, isReplaying]);
+  }, [selectedDevices, mapCenter, zoomLevel, getCurrentReplayPoint]);
 
   // Cleanup replay interval on unmount
   useEffect(() => {

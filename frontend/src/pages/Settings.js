@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
-  Paper,
   Typography,
   Grid,
   TextField,
@@ -21,18 +20,13 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
-  IconButton,
-  LinearProgress,
   Chip,
-  Tooltip,
   useTheme,
   MenuItem
 } from '@mui/material';
 import {
   Save as SaveIcon,
   Backup as BackupIcon,
-  RestoreFromTrash as RestoreIcon,
-  Delete as DeleteIcon,
   FileDownload as ExportIcon,
   FileUpload as ImportIcon,
   Refresh as RefreshIcon,
@@ -46,7 +40,7 @@ import {
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon
 } from '@mui/icons-material';
-import axios from 'axios';
+// import axios from 'axios';
 import { BASE_URL } from '../services/api';
 import { alpha } from '@mui/material/styles';
 import { useTheme as useAppTheme } from '../contexts/ThemeContext';
@@ -73,7 +67,7 @@ const Settings = () => {
     severity: 'success'
   });
 
-  const [backups, setBackups] = useState([]);
+  // const [backups, setBackups] = useState([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [backupDialogOpen, setBackupDialogOpen] = useState(false);
@@ -308,7 +302,7 @@ const Settings = () => {
     }
   };
 
-  const handleRestoreBackup = async (backupId) => {
+  // const handleRestoreBackup = async (backupFile) => {
     try {
       await authenticatedFetch(`${BASE_URL}/api/settings/backups/${backupId}/restore`, {
         method: 'POST'
@@ -321,7 +315,7 @@ const Settings = () => {
     }
   };
 
-  const handleDeleteBackup = async (backupId) => {
+  // const handleDeleteBackup = async (backupFile) => {
     try {
       await authenticatedFetch(`${BASE_URL}/api/settings/backups/${backupId}`, {
         method: 'DELETE'

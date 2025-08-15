@@ -27,7 +27,7 @@ L.Icon.Default.mergeOptions({
 const TrackingMap = ({ height = 400, showInfo = true }) => {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error] = useState(null);
   const [mapCenter, setMapCenter] = useState([0, 0]);
   const [mapZoom, setMapZoom] = useState(2);
 
@@ -157,7 +157,7 @@ const TrackingMap = ({ height = 400, showInfo = true }) => {
   }, []);
 
   // Connect to WebSocket for real-time updates
-  const ws = useWebSocket(`${BASE_URL.replace('http', 'ws')}`, handleWebSocketMessage);
+    // const ws = new WebSocket(wsUrl);
 
   // Load initial data
   useEffect(() => {

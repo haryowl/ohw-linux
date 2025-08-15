@@ -228,7 +228,7 @@ const UserManagement = () => {
   ], []);
 
   // Helper functions
-  const getAuthHeaders = useCallback(() => {
+  // const getAuthHeaders = () => {
     return {
       'Content-Type': 'application/json'
     };
@@ -287,7 +287,7 @@ const UserManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [authenticatedFetch, fetchUsers]);
+  }, [fetchUsers]);
 
   useEffect(() => {
     loadData();
@@ -404,7 +404,7 @@ const UserManagement = () => {
     } catch (error) {
       setError('Failed to save user');
     }
-  }, [selectedItems.user, forms.user, authenticatedFetch, closeDialog, resetForm, loadData]);
+  }, [fetchUsers]);
 
   const handleGroupSubmit = useCallback(async () => {
     try {
@@ -428,7 +428,7 @@ const UserManagement = () => {
     } catch (error) {
       setError('Failed to save group');
     }
-  }, [selectedItems.group, forms.group, authenticatedFetch, closeDialog, resetForm, loadData]);
+  }, [fetchUsers]);
 
   const handleDeleteUser = useCallback(async (userId) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
@@ -447,7 +447,7 @@ const UserManagement = () => {
     } catch (error) {
       setError('Failed to delete user');
     }
-  }, [authenticatedFetch, loadData]);
+  }, [fetchUsers]);
 
   const handleDeleteGroup = useCallback(async (groupId) => {
     if (!window.confirm('Are you sure you want to delete this group?')) return;
@@ -466,7 +466,7 @@ const UserManagement = () => {
     } catch (error) {
       setError('Failed to delete group');
     }
-  }, [authenticatedFetch, loadData]);
+  }, [fetchUsers]);
 
   if (loading) {
     return (
