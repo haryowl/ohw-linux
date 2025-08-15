@@ -226,19 +226,33 @@ cd ..
 :: Step 8: Create shortcuts and documentation
 echo [STEP 8/8] Creating shortcuts and documentation...
 
-:: Create desktop shortcut
-echo [INFO] Creating desktop shortcut...
+:: Create desktop shortcuts
+echo [INFO] Creating desktop shortcuts...
 set "DESKTOP=%USERPROFILE%\Desktop"
+
+:: Main application shortcut
 set "SHORTCUT=%DESKTOP%\Galileosky Parser.lnk"
+powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k cd /d \"%PROJECT_DIR%\WindowsGS\" ^&^& start-application.bat'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application'; $Shortcut.Save()}"
 
-powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k cd /d \"%PROJECT_DIR%\WindowsGS\" ^&^& echo Starting Galileosky Parser... ^&^& cd backend ^&^& npm start'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application'; $Shortcut.Save()}"
+:: Production mode shortcut
+set "PROD_SHORTCUT=%DESKTOP%\Galileosky Parser (Production).lnk"
+powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%PROD_SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k cd /d \"%PROJECT_DIR%\WindowsGS\" ^&^& start-production.bat'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application (Production Mode)'; $Shortcut.Save()}"
 
-:: Create start menu shortcut
-echo [INFO] Creating start menu shortcut...
+:: Stop application shortcut
+set "STOP_SHORTCUT=%DESKTOP%\Stop Galileosky Parser.lnk"
+powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%STOP_SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k cd /d \"%PROJECT_DIR%\WindowsGS\" ^&^& stop-application.bat'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Stop Galileosky Parser Application'; $Shortcut.Save()}"
+
+:: Create start menu shortcuts
+echo [INFO] Creating start menu shortcuts...
 set "START_MENU=%APPDATA%\Microsoft\Windows\Start Menu\Programs"
-set "START_SHORTCUT=%START_MENU%\Galileosky Parser.lnk"
 
-powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%START_SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k cd /d \"%PROJECT_DIR%\WindowsGS\" ^&^& echo Starting Galileosky Parser... ^&^& cd backend ^&^& npm start'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application'; $Shortcut.Save()}"
+:: Main application shortcut
+set "START_SHORTCUT=%START_MENU%\Galileosky Parser.lnk"
+powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%START_SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k cd /d \"%PROJECT_DIR%\WindowsGS\" ^&^& start-application.bat'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application'; $Shortcut.Save()}"
+
+:: Production mode shortcut
+set "START_PROD_SHORTCUT=%START_MENU%\Galileosky Parser (Production).lnk"
+powershell -Command "& {$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%START_PROD_SHORTCUT%'); $Shortcut.TargetPath = 'cmd.exe'; $Shortcut.Arguments = '/k cd /d \"%PROJECT_DIR%\WindowsGS\" ^&^& start-production.bat'; $Shortcut.WorkingDirectory = '%PROJECT_DIR%\WindowsGS'; $Shortcut.Description = 'Galileosky Parser Windows Application (Production Mode)'; $Shortcut.Save()}"
 
 :: Create uninstaller
 echo [INFO] Creating uninstaller...
@@ -269,8 +283,13 @@ echo. >> "%USER_README%"
 echo Project Location: %PROJECT_DIR%\WindowsGS >> "%USER_README%"
 echo. >> "%USER_README%"
 echo How to Start: >> "%USER_README%"
-echo 1. Double-click the desktop shortcut "Galileosky Parser" >> "%USER_README%"
-echo 2. Or navigate to the project folder and run: cd backend ^&^& npm start >> "%USER_README%"
+echo 1. Double-click "Galileosky Parser" (Development Mode) >> "%USER_README%"
+echo 2. Double-click "Galileosky Parser (Production)" (Production Mode) >> "%USER_README%"
+echo 3. Or run start-application.bat or start-production.bat manually >> "%USER_README%"
+echo. >> "%USER_README%"
+echo How to Stop: >> "%USER_README%"
+echo 1. Double-click "Stop Galileosky Parser" shortcut >> "%USER_README%"
+echo 2. Or run stop-application.bat manually >> "%USER_README%"
 echo. >> "%USER_README%"
 echo Access Points: >> "%USER_README%"
 echo - Web Dashboard: http://localhost:3002 >> "%USER_README%"
@@ -293,14 +312,18 @@ echo ========================================
 echo.
 echo Project installed at: %PROJECT_DIR%\WindowsGS
 echo.
-echo Desktop shortcut created: Galileosky Parser
-echo Start menu shortcut created: Galileosky Parser
+echo Desktop shortcuts created:
+echo - Galileosky Parser (Development Mode)
+echo - Galileosky Parser (Production Mode)
+echo - Stop Galileosky Parser
+echo.
+echo Start menu shortcuts created:
+echo - Galileosky Parser (Development Mode)
+echo - Galileosky Parser (Production Mode)
 echo.
 echo To start the application:
-echo 1. Double-click the desktop shortcut, OR
-echo 2. Open Command Prompt and run:
-echo    cd "%PROJECT_DIR%\WindowsGS\backend"
-echo    npm start
+echo 1. Double-click "Galileosky Parser" for development mode, OR
+echo 2. Double-click "Galileosky Parser (Production)" for production mode
 echo.
 echo Access the application at:
 echo - Web Dashboard: http://localhost:3002
