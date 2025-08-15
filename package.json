@@ -22,6 +22,7 @@
     "deploy-prod": "cd backend && node deploy-config.js production && cd ../frontend && node deploy-config.js production",
     "deploy-current": "cd backend && node deploy-config.js current && cd ../frontend && node deploy-config.js current",
     "setup-admin": "cd backend && node create-default-admin.js",
+    "init-db": "cd backend && node init-database.js",
     "clean": "cd frontend && Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue && cd ../mobile-frontend && Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue",
     "pm2-start": "pm2 start ecosystem.config.js",
     "pm2-stop": "pm2 stop ecosystem.config.js",

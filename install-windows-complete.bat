@@ -176,6 +176,15 @@ cd ..
 :: Step 6: Initialize database and create admin user
 echo [STEP 6/8] Setting up database and admin user...
 cd backend
+
+echo [INFO] Initializing database schema...
+call node init-database.js
+if %errorLevel% neq 0 (
+    echo [ERROR] Database initialization failed
+    exit /b 1
+)
+
+echo [INFO] Creating admin user...
 call node create-default-admin.js
 
 cd ..
