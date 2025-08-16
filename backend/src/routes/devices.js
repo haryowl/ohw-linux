@@ -33,20 +33,26 @@ function setCachedDevices(userId, role, data) {
 
 // Get all devices (filtered by user permissions) - OPTIMIZED
 router.get('/', requireAuth, filterDevicesByPermission, asyncHandler(async (req, res) => {
-    console.log('GET /api/devices - User:', req.user.username, 'Role:', req.user.role);
+    const requestStart = Date.now();
+    console.log('🚀 GET /api/devices - Starting request');
+    console.log('👤 User:', req.user.username, 'Role:', req.user.role);
     
     // Check cache first
     const cachedDevices = getCachedDevices(req.user.userId, req.user.role);
     if (cachedDevices) {
-        console.log('Returning cached devices:', cachedDevices.length);
+        const cacheTime = Date.now() - requestStart;
+        console.log(`⚡ CACHE HIT: Returning ${cachedDevices.length} cached devices in ${cacheTime}ms`);
         return res.json(cachedDevices);
     }
+    
+    console.log('🔄 CACHE MISS: Fetching from database...');
+    const dbStart = Date.now();
     
     let devices;
     
     // If admin, get all devices with optimized query
     if (req.user.role === 'admin') {
-        console.log('Admin user - getting all devices');
+        console.log('👑 Admin user - getting all devices');
         devices = await Device.findAll({
             include: [{
                 model: require('../models').FieldMapping,
@@ -59,7 +65,7 @@ router.get('/', requireAuth, filterDevicesByPermission, asyncHandler(async (req,
             limit: 1000
         });
     } else {
-        console.log('Non-admin user - filtering devices by permissions');
+        console.log('👤 Non-admin user - filtering devices by permissions');
         // Optimized query for non-admin users
         const { userPermissions } = req;
         
@@ -127,10 +133,15 @@ router.get('/', requireAuth, filterDevicesByPermission, asyncHandler(async (req,
         }
     }
     
+    const dbTime = Date.now() - dbStart;
+    console.log(`📊 Database query completed in ${dbTime}ms - Found ${devices.length} devices`);
+    
     // Cache the result
     setCachedDevices(req.user.userId, req.user.role, devices);
     
-    console.log('Returning devices:', devices.length);
+    const totalTime = Date.now() - requestStart;
+    console.log(`✅ Request completed in ${totalTime}ms - Returning ${devices.length} devices`);
+    
     res.json(devices);
 }));
 
