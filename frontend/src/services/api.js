@@ -1,28 +1,15 @@
 // frontend/src/services/api.js
 
 // Dynamic API URL detection - works for both localhost and IP access
+// Using the same logic as AuthContext.js since that's working correctly
 function getApiBaseUrl() {
   // Get the current frontend URL
   const currentUrl = window.location.href;
   console.log('🔍 Current URL:', currentUrl);
   console.log('🔍 Hostname:', window.location.hostname);
-  console.log('🔍 Protocol:', window.location.protocol);
-  console.log('🔍 Port:', window.location.port);
-  console.log('🔍 Full location object:', window.location);
-  
-  // Check all possible localhost conditions
-  const hasLocalhost = currentUrl.includes('localhost');
-  const has127 = currentUrl.includes('127.0.0.1');
-  const hostnameIsLocalhost = window.location.hostname === 'localhost';
-  const hostnameIs127 = window.location.hostname === '127.0.0.1';
-  
-  console.log('🔍 hasLocalhost:', hasLocalhost);
-  console.log('🔍 has127:', has127);
-  console.log('🔍 hostnameIsLocalhost:', hostnameIsLocalhost);
-  console.log('🔍 hostnameIs127:', hostnameIs127);
   
   // If accessing from localhost, use localhost backend
-  if (hasLocalhost || has127 || hostnameIsLocalhost || hostnameIs127) {
+  if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
     console.log('🔍 API URL Detection: Using localhost backend');
     return 'http://localhost:3001';
   }
