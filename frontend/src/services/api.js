@@ -8,9 +8,21 @@ function getApiBaseUrl() {
   console.log('🔍 Hostname:', window.location.hostname);
   console.log('🔍 Protocol:', window.location.protocol);
   console.log('🔍 Port:', window.location.port);
+  console.log('🔍 Full location object:', window.location);
+  
+  // Check all possible localhost conditions
+  const hasLocalhost = currentUrl.includes('localhost');
+  const has127 = currentUrl.includes('127.0.0.1');
+  const hostnameIsLocalhost = window.location.hostname === 'localhost';
+  const hostnameIs127 = window.location.hostname === '127.0.0.1';
+  
+  console.log('🔍 hasLocalhost:', hasLocalhost);
+  console.log('🔍 has127:', has127);
+  console.log('🔍 hostnameIsLocalhost:', hostnameIsLocalhost);
+  console.log('🔍 hostnameIs127:', hostnameIs127);
   
   // If accessing from localhost, use localhost backend
-  if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1') || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  if (hasLocalhost || has127 || hostnameIsLocalhost || hostnameIs127) {
     console.log('🔍 API URL Detection: Using localhost backend');
     return 'http://localhost:3001';
   }
