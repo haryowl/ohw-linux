@@ -108,27 +108,24 @@ export function DataProvider({ children }) {
     try {
       console.log('📊 fetchRecords: Starting...');
       const startTime = Date.now();
-      // Fetch all records for the last 24h by default
-      const response = await fetch(`${BASE_URL}/api/records?range=24h&limit=all`, {
-        credentials: 'include' // Include cookies in the request
+      // Fetch only recent records with a reasonable limit to prevent timeout
+      const response = await fetch(`${BASE_URL}/api/records?range=1h&limit=100`, {
+        credentials: 'include'
       });
-      if (!response.ok) {
-        if (response.status === 401) {
-          console.log('User not authenticated, skipping records fetch');
-          setRecords([]);
-          return;
-        }
-        console.warn('Records endpoint returned error, using empty array');
-        setRecords([]);
-        return;
+      
+      if (response.ok) {
+        const data = await response.json();
+        const loadTime = Date.now() - startTime;
+        console.log(`📊 fetchRecords: Loaded ${data.length} records in ${loadTime}ms`);
+        setRecords(data);
+        return data;
+      } else {
+        console.error('📊 fetchRecords: Failed:', response.status);
+        return [];
       }
-      const data = await response.json();
-      const loadTime = Date.now() - startTime;
-      console.log(`📊 fetchRecords: Loaded ${data.length} records in ${loadTime}ms`);
-      setRecords(data);
     } catch (error) {
       console.error('📊 fetchRecords: Error:', error);
-      setRecords([]); // Use empty array instead of setting error
+      return [];
     }
   }, []);
 

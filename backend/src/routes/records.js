@@ -5,23 +5,34 @@ const { Op } = require('sequelize');
 const { Parser: Json2csvParser } = require('json2csv');
 const ExcelJS = require('exceljs');
 
-// Get records with optional date filtering
+// Get records with optional date filtering - OPTIMIZED
 router.get('/', async (req, res) => {
     try {
-        let { startDate, endDate, limit = 1000, range, imeis } = req.query;
+        const requestStart = Date.now();
+        console.log('🚀 GET /api/records - Starting request');
+        
+        let { startDate, endDate, limit = 100, range, imeis } = req.query;
         const where = {};
         const now = new Date();
+        
+        // Better defaults to prevent massive queries
         if (!range && !startDate && !endDate) {
-            // Default to last 24h
-            range = '24h';
+            // Default to last 1h instead of 24h for better performance
+            range = '1h';
         }
+        
         if (range === '24h') {
             startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             endDate = now;
+        } else if (range === '1h') {
+            startDate = new Date(now.getTime() - 60 * 60 * 1000);
+            endDate = now;
         } else if (range === 'all') {
-            startDate = null;
-            endDate = null;
+            // For 'all' requests, limit to last 7 days to prevent timeout
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            endDate = now;
         }
+        
         if (startDate && endDate) {
             where.datetime = {
                 [Op.between]: [new Date(startDate), new Date(endDate)]
@@ -38,18 +49,36 @@ router.get('/', async (req, res) => {
             }
         }
         
+        // Better limit handling to prevent massive queries
         let queryLimit = parseInt(limit);
         if (limit === 'all' || queryLimit === 0 || isNaN(queryLimit)) {
-            queryLimit = null; // No limit
+            // Cap at 1000 records for 'all' requests to prevent timeout
+            queryLimit = 1000;
+        } else if (queryLimit > 1000) {
+            // Cap at 1000 records maximum
+            queryLimit = 1000;
         }
+        
+        console.log(`📊 Records query: ${range || 'custom'} range, limit: ${queryLimit}`);
+        const dbStart = Date.now();
+        
         const records = await Record.findAll({
             where,
             order: [['datetime', 'DESC']],
-            limit: queryLimit
+            limit: queryLimit,
+            // Add attributes to reduce data transfer
+            attributes: ['id', 'deviceImei', 'datetime', 'latitude', 'longitude', 'altitude', 'speed', 'course', 'satellites', 'hdop', 'forwarded']
         });
+        
+        const dbTime = Date.now() - dbStart;
+        const totalTime = Date.now() - requestStart;
+        
+        console.log(`✅ Records query completed in ${dbTime}ms - Found ${records.length} records`);
+        console.log(`✅ Total request time: ${totalTime}ms`);
+        
         res.json(records);
     } catch (error) {
-        console.error('Error fetching records:', error);
+        console.error('❌ Error fetching records:', error);
         res.status(500).json({ 
             error: 'Failed to fetch records', 
             details: error.message, 
