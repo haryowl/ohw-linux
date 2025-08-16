@@ -106,6 +106,8 @@ export function DataProvider({ children }) {
 
   const fetchRecords = useCallback(async () => {
     try {
+      console.log('📊 fetchRecords: Starting...');
+      const startTime = Date.now();
       // Fetch all records for the last 24h by default
       const response = await fetch(`${BASE_URL}/api/records?range=24h&limit=all`, {
         credentials: 'include' // Include cookies in the request
@@ -121,15 +123,19 @@ export function DataProvider({ children }) {
         return;
       }
       const data = await response.json();
+      const loadTime = Date.now() - startTime;
+      console.log(`📊 fetchRecords: Loaded ${data.length} records in ${loadTime}ms`);
       setRecords(data);
     } catch (error) {
-      console.error('Error fetching records:', error);
+      console.error('📊 fetchRecords: Error:', error);
       setRecords([]); // Use empty array instead of setting error
     }
   }, []);
 
   const fetchAlerts = useCallback(async () => {
     try {
+      console.log('🚨 fetchAlerts: Starting...');
+      const startTime = Date.now();
       const response = await fetch(`${BASE_URL}/api/alerts`, {
         credentials: 'include' // Include cookies in the request
       });
@@ -142,15 +148,19 @@ export function DataProvider({ children }) {
         throw new Error('Failed to fetch alerts');
       }
       const data = await response.json();
+      const loadTime = Date.now() - startTime;
+      console.log(`🚨 fetchAlerts: Loaded ${data.length} alerts in ${loadTime}ms`);
       setAlerts(data);
     } catch (error) {
-      console.error('Error fetching alerts:', error);
+      console.error('🚨 fetchAlerts: Error:', error);
       setError('Failed to load alerts');
     }
   }, []);
 
   const fetchStats = useCallback(async () => {
     try {
+      console.log('📈 fetchStats: Starting...');
+      const startTime = Date.now();
       const response = await fetch(`${BASE_URL}/api/dashboard/stats`, {
         credentials: 'include' // Include cookies in the request
       });
@@ -171,12 +181,14 @@ export function DataProvider({ children }) {
         return;
       }
       const data = await response.json();
+      const loadTime = Date.now() - startTime;
+      console.log(`📈 fetchStats: Loaded stats in ${loadTime}ms`);
       setStats({
         ...data,
         lastUpdate: new Date()
       });
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('📈 fetchStats: Error:', error);
       setStats(prev => ({
         ...prev,
         lastUpdate: new Date()
@@ -195,18 +207,44 @@ export function DataProvider({ children }) {
         const startTime = Date.now();
         
         // Load devices first (most important for dashboard)
+        console.log('📱 Starting device fetch...');
         const devicesPromise = fetchDevices();
         
-        // Load other data in parallel
-        const [devices] = await Promise.all([
-          devicesPromise,
-          fetchRecords(),
-          fetchAlerts(),
-          fetchStats()
+        // Load other data in parallel with individual logging
+        console.log('📊 Starting records fetch...');
+        const recordsPromise = fetchRecords().catch(err => {
+          console.error('❌ Records fetch failed:', err);
+          return [];
+        });
+        
+        console.log('🚨 Starting alerts fetch...');
+        const alertsPromise = fetchAlerts().catch(err => {
+          console.error('❌ Alerts fetch failed:', err);
+          return [];
+        });
+        
+        console.log('📈 Starting stats fetch...');
+        const statsPromise = fetchStats().catch(err => {
+          console.error('❌ Stats fetch failed:', err);
+          return {};
+        });
+        
+        // Wait for all promises with timeout
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Data loading timeout')), 10000)
+        );
+        
+        const [devices, records, alerts, stats] = await Promise.race([
+          Promise.all([devicesPromise, recordsPromise, alertsPromise, statsPromise]),
+          timeoutPromise
         ]);
         
         const totalLoadTime = Date.now() - startTime;
         console.log(`✅ All data loaded in ${totalLoadTime}ms`);
+        console.log(`📱 Devices: ${devices?.length || 0}`);
+        console.log(`📊 Records: ${records?.length || 0}`);
+        console.log(`🚨 Alerts: ${alerts?.length || 0}`);
+        console.log(`📈 Stats: ${stats ? 'loaded' : 'failed'}`);
         
         // If devices loaded successfully, we can show the dashboard
         if (devices && devices.length > 0) {
@@ -214,9 +252,10 @@ export function DataProvider({ children }) {
         }
         
       } catch (error) {
-        console.error('Error loading initial data:', error);
+        console.error('❌ Error loading initial data:', error);
         setError('Failed to load application data');
       } finally {
+        console.log('🏁 Setting loading to false');
         setLoading(false);
       }
     };
