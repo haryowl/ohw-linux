@@ -4,21 +4,30 @@
 function getApiBaseUrl() {
   // Get the current frontend URL
   const currentUrl = window.location.href;
+  console.log('🔍 Current URL:', currentUrl);
+  console.log('🔍 Hostname:', window.location.hostname);
+  console.log('🔍 Protocol:', window.location.protocol);
+  console.log('🔍 Port:', window.location.port);
   
   // If accessing from localhost, use localhost backend
-  if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
+  if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1') || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    console.log('🔍 API URL Detection: Using localhost backend');
     return 'http://localhost:3001';
   }
   
   // If accessing from IP address, use the same IP for backend
   const url = new URL(currentUrl);
-  return `http://${url.hostname}:3001`;
+  const detectedUrl = `http://${url.hostname}:3001`;
+  console.log('🔍 API URL Detection: Using IP backend:', detectedUrl);
+  return detectedUrl;
 }
 
 // API URL configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || getApiBaseUrl();
 
 export const BASE_URL = API_BASE_URL;
+
+console.log('🚀 Final API Base URL:', BASE_URL);
 
 // Helper function to get auth headers (for cookie-based auth, we don't need Authorization header)
 function getAuthHeaders() {
