@@ -21,8 +21,8 @@ function getApiBaseUrl() {
   return detectedUrl;
 }
 
-// API URL configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || getApiBaseUrl();
+// API URL configuration - Force dynamic detection, ignore environment variables
+const API_BASE_URL = getApiBaseUrl();
 
 export const BASE_URL = API_BASE_URL;
 
