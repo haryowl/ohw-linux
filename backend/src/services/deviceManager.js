@@ -8,6 +8,8 @@ class DeviceManager {
     constructor() {
         this.devices = new Map();
         this.mappings = new Map();
+        this.deviceCache = new Map();
+        this.cacheTimeout = 30000; // 30 seconds
         this.startCleanupInterval();
     }
 
@@ -47,6 +49,9 @@ class DeviceManager {
                 connectionCount: 0,
                 info: deviceInfo
             });
+
+            // Clear cache to ensure fresh data
+            this.clearDeviceCache();
 
             logger.info(`Device registered: ${device.id} (${device.imei})`);
             return device;
@@ -228,17 +233,45 @@ class DeviceManager {
 
     async getAllDevices() {
         try {
-            return await Device.findAll({
+            // Check cache first
+            const cacheKey = 'all_devices';
+            const cached = this.deviceCache.get(cacheKey);
+            if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+                logger.debug('Returning cached devices');
+                return cached.data;
+            }
+
+            logger.debug('Fetching devices from database...');
+            const devices = await Device.findAll({
                 include: [{
                     model: FieldMapping,
-                    as: 'mappings'
+                    as: 'mappings',
+                    where: { enabled: true },
+                    required: false
                 }],
-                order: [['lastSeen', 'DESC']]
+                order: [['lastSeen', 'DESC']],
+                // Add limit to prevent loading too many devices
+                limit: 1000
             });
+
+            // Cache the result
+            this.deviceCache.set(cacheKey, {
+                data: devices,
+                timestamp: Date.now()
+            });
+
+            logger.info(`Loaded ${devices.length} devices from database`);
+            return devices;
         } catch (error) {
             logger.error('Error getting all devices:', error);
             throw error;
         }
+    }
+
+    // Clear cache when devices are updated
+    clearDeviceCache() {
+        this.deviceCache.clear();
+        logger.debug('Device cache cleared');
     }
 
     async getDeviceById(deviceId) {

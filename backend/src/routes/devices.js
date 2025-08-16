@@ -10,87 +10,125 @@ const { Op } = require('sequelize');
 const { requireAuth } = require('./auth');
 const { checkDeviceAccess, filterDevicesByPermission } = require('../middleware/permissions');
 
-// Get all devices (filtered by user permissions)
+// Simple in-memory cache for devices (5 minutes TTL)
+const deviceCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCachedDevices(userId, role) {
+    const cacheKey = `${userId}-${role}`;
+    const cached = deviceCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.data;
+    }
+    return null;
+}
+
+function setCachedDevices(userId, role, data) {
+    const cacheKey = `${userId}-${role}`;
+    deviceCache.set(cacheKey, {
+        data,
+        timestamp: Date.now()
+    });
+}
+
+// Get all devices (filtered by user permissions) - OPTIMIZED
 router.get('/', requireAuth, filterDevicesByPermission, asyncHandler(async (req, res) => {
     console.log('GET /api/devices - User:', req.user.username, 'Role:', req.user.role);
-    console.log('User permissions:', JSON.stringify(req.user.permissions, null, 2));
+    
+    // Check cache first
+    const cachedDevices = getCachedDevices(req.user.userId, req.user.role);
+    if (cachedDevices) {
+        console.log('Returning cached devices:', cachedDevices.length);
+        return res.json(cachedDevices);
+    }
     
     let devices;
     
-    // If admin, get all devices
+    // If admin, get all devices with optimized query
     if (req.user.role === 'admin') {
         console.log('Admin user - getting all devices');
-        devices = await deviceManager.getAllDevices();
+        devices = await Device.findAll({
+            include: [{
+                model: require('../models').FieldMapping,
+                as: 'mappings',
+                where: { enabled: true },
+                required: false
+            }],
+            order: [['lastSeen', 'DESC']],
+            // Add limit to prevent loading too many devices at once
+            limit: 1000
+        });
     } else {
         console.log('Non-admin user - filtering devices by permissions');
-        // Filter devices based on user permissions
+        // Optimized query for non-admin users
         const { userPermissions } = req;
-        console.log('User permissions from middleware:', JSON.stringify(userPermissions, null, 2));
         
-        const accessibleDevices = [];
+        // Build efficient query conditions
+        const deviceConditions = [];
+        const groupConditions = [];
         
-        // Get devices from direct access (both permissions and UserDeviceAccess table)
-        const directDeviceImeis = [];
-        
-        // From permissions.devices
+        // Direct device access
         if (userPermissions.devices && userPermissions.devices.length > 0) {
-            directDeviceImeis.push(...userPermissions.devices);
+            deviceConditions.push({ imei: { [Op.in]: userPermissions.devices } });
         }
         
-        // From UserDeviceAccess table
+        // Device group access
+        if (userPermissions.deviceGroups && userPermissions.deviceGroups.length > 0) {
+            groupConditions.push({ id: { [Op.in]: userPermissions.deviceGroups } });
+        }
+        
+        // User device access from UserDeviceAccess table
         const { UserDeviceAccess } = require('../models');
         const userDeviceAccess = await UserDeviceAccess.findAll({
             where: { 
                 userId: req.user.userId,
                 isActive: true
             },
-            include: [
-                {
-                    model: Device,
-                    as: 'device'
-                }
-            ]
+            attributes: ['deviceId'],
+            raw: true
         });
         
-        for (const access of userDeviceAccess) {
-            if (access.device && !directDeviceImeis.includes(access.device.imei)) {
-                directDeviceImeis.push(access.device.imei);
-            }
+        if (userDeviceAccess.length > 0) {
+            const deviceIds = userDeviceAccess.map(access => access.deviceId);
+            deviceConditions.push({ id: { [Op.in]: deviceIds } });
         }
         
-        if (directDeviceImeis.length > 0) {
-            console.log('Getting devices from direct access:', directDeviceImeis);
-            const directDevices = await Device.findAll({
-                where: { imei: directDeviceImeis }
-            });
-            console.log('Direct devices found:', directDevices.length);
-            accessibleDevices.push(...directDevices);
+        // Combine all conditions
+        const whereCondition = deviceConditions.length > 0 ? { [Op.or]: deviceConditions } : {};
+        
+        // Get devices with single optimized query
+        devices = await Device.findAll({
+            where: whereCondition,
+            include: [
+                {
+                    model: require('../models').FieldMapping,
+                    as: 'mappings',
+                    where: { enabled: true },
+                    required: false
+                },
+                // Include device groups if needed
+                ...(groupConditions.length > 0 ? [{
+                    model: DeviceGroup,
+                    as: 'groups',
+                    where: { [Op.or]: groupConditions },
+                    required: false
+                }] : [])
+            ],
+            order: [['lastSeen', 'DESC']],
+            limit: 1000
+        });
+        
+        // Filter out devices that don't have any group access if groups were specified
+        if (groupConditions.length > 0) {
+            devices = devices.filter(device => 
+                deviceConditions.length > 0 || 
+                (device.groups && device.groups.length > 0)
+            );
         }
-        
-        // Get devices from device groups
-        if (userPermissions.deviceGroups && userPermissions.deviceGroups.length > 0) {
-            console.log('Getting devices from device groups:', userPermissions.deviceGroups);
-            const deviceGroups = await DeviceGroup.findAll({
-                where: { id: userPermissions.deviceGroups },
-                include: ['devices']
-            });
-            
-            for (const group of deviceGroups) {
-                if (group.devices) {
-                    console.log(`Group ${group.name} has ${group.devices.length} devices`);
-                    accessibleDevices.push(...group.devices);
-                }
-            }
-        }
-        
-        // Remove duplicates
-        const uniqueDevices = accessibleDevices.filter((device, index, self) => 
-            index === self.findIndex(d => d.imei === device.imei)
-        );
-        
-        console.log('Total accessible devices:', uniqueDevices.length);
-        devices = uniqueDevices;
     }
+    
+    // Cache the result
+    setCachedDevices(req.user.userId, req.user.role, devices);
     
     console.log('Returning devices:', devices.length);
     res.json(devices);

@@ -81,12 +81,17 @@ export function DataProvider({ children }) {
   // Fetch initial data
   const fetchDevices = useCallback(async () => {
     try {
+      console.log('🔄 Fetching devices...');
+      const startTime = Date.now();
+      
       const response = await fetch(`${BASE_URL}/api/devices`, {
         credentials: 'include' // Include cookies in the request
       });
       
       if (response.ok) {
         const devices = await response.json();
+        const loadTime = Date.now() - startTime;
+        console.log(`✅ Devices loaded in ${loadTime}ms:`, devices.length);
         setDevices(devices);
         return devices;
       } else {
@@ -179,19 +184,35 @@ export function DataProvider({ children }) {
     }
   }, []);
 
-  // Load initial data
+  // Load initial data with optimized loading
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       setError(null);
       
       try {
-        await Promise.all([
-          fetchDevices(),
+        console.log('🚀 Starting initial data load...');
+        const startTime = Date.now();
+        
+        // Load devices first (most important for dashboard)
+        const devicesPromise = fetchDevices();
+        
+        // Load other data in parallel
+        const [devices] = await Promise.all([
+          devicesPromise,
           fetchRecords(),
           fetchAlerts(),
           fetchStats()
         ]);
+        
+        const totalLoadTime = Date.now() - startTime;
+        console.log(`✅ All data loaded in ${totalLoadTime}ms`);
+        
+        // If devices loaded successfully, we can show the dashboard
+        if (devices && devices.length > 0) {
+          console.log('📱 Dashboard ready with devices');
+        }
+        
       } catch (error) {
         console.error('Error loading initial data:', error);
         setError('Failed to load application data');
@@ -203,9 +224,10 @@ export function DataProvider({ children }) {
     loadData();
   }, [fetchDevices, fetchRecords, fetchAlerts, fetchStats]);
 
-  // Refresh data periodically
+  // Refresh data periodically with optimized intervals
   useEffect(() => {
     const interval = setInterval(() => {
+      // Only refresh stats, not all data
       fetchStats();
     }, 30000); // Refresh stats every 30 seconds
 
