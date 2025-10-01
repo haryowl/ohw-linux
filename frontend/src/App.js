@@ -20,9 +20,13 @@ import Settings from './pages/Settings';
 import Alerts from './pages/Alerts';
 import DataTablePage from './pages/DataTable';
 import DataExport from './pages/DataExport';
+import DataSM from './pages/DataSM';
 import Login from './pages/Login';
 import OfflineGridDemo from './components/OfflineGridDemo';
 import UserManagement from './pages/UserManagement';
+import DeviceGroupManagement from './pages/DeviceGroupManagement';
+import RoleManagement from './pages/RoleManagement';
+import MultiTracking from './pages/MultiTracking';
 
 function App() {
   return (
@@ -79,6 +83,11 @@ function AppContent() {
                       <Layout><Tracking /></Layout>
                     </ProtectedRoute>
                   } />
+                  <Route path="/multi-tracking" element={
+                    <ProtectedRoute requiredPermission="tracking">
+                      <Layout><MultiTracking /></Layout>
+                    </ProtectedRoute>
+                  } />
                   <Route path="/settings" element={
                     <ProtectedRoute requiredPermission="settings">
                       <Layout><Settings /></Layout>
@@ -99,6 +108,11 @@ function AppContent() {
                       <Layout><DataExport /></Layout>
                     </ProtectedRoute>
                   } />
+                  <Route path="/data-sm" element={
+                    <ProtectedRoute requiredPermission="data-sm">
+                      <Layout><DataSM /></Layout>
+                    </ProtectedRoute>
+                  } />
                   <Route path="/demo" element={
                     <ProtectedRoute requiredPermission="demo">
                       <Layout><OfflineGridDemo /></Layout>
@@ -107,6 +121,16 @@ function AppContent() {
                   <Route path="/user-management" element={
                     <ProtectedRoute requiredPermission="user-management">
                       <Layout><UserManagement /></Layout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/role-management" element={
+                    <ProtectedRoute requiredPermission="user-management">
+                      <Layout><RoleManagement /></Layout>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/device-groups" element={
+                    <ProtectedRoute requiredPermission="device-groups">
+                      <Layout><DeviceGroupManagement /></Layout>
                     </ProtectedRoute>
                   } />
                   <Route path="*" element={<Navigate to="/" replace />} />

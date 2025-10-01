@@ -32,7 +32,13 @@ import {
   FormControlLabel,
   Tooltip,
   Avatar,
-  Divider
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Checkbox,
+  FormGroup
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -40,13 +46,23 @@ import {
   Delete as DeleteIcon,
   Person as PersonIcon,
   Group as GroupIcon,
-  Devices as DevicesIcon
+  Devices as DevicesIcon,
+  AccessTime as AccessTimeIcon,
+  Security as SecurityIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { BASE_URL, authenticatedFetch } from '../services/api';
+import { 
+  apiFetchUserDeviceGroupAccess, 
+  apiFetchUserDeviceGroupAccessByUser, 
+  apiGrantUserDeviceGroupAccess, 
+  apiUpdateUserDeviceGroupAccess, 
+  apiRevokeUserDeviceGroupAccess,
+  apiBulkGrantUserDeviceGroupAccess
+} from '../services/api';
 
 // Memoized components to reduce re-renders
-const UserRow = React.memo(({ user, currentUser, onEdit, onDelete, onDeviceAccess, onGroupAccess }) => (
+const UserRow = React.memo(({ user, currentUser, onEdit, onDelete, onDeviceAccess, onGroupAccess, roles }) => (
   <TableRow key={user.id}>
     <TableCell>
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -65,8 +81,16 @@ const UserRow = React.memo(({ user, currentUser, onEdit, onDelete, onDeviceAcces
     </TableCell>
     <TableCell>
       <Chip
-        label={user.role === 'admin' ? 'Administrator' : user.role === 'manager' ? 'Manager' : user.role === 'operator' ? 'Operator' : 'Viewer'}
-        color={user.role === 'admin' ? 'error' : user.role === 'manager' ? 'warning' : user.role === 'operator' ? 'info' : 'default'}
+        label={
+          user.roleId 
+            ? (roles.find(r => r.value === user.roleId.toString())?.label || 'Custom Role')
+            : (user.role === 'admin' ? 'Administrator' : user.role === 'manager' ? 'Manager' : user.role === 'operator' ? 'Operator' : 'Viewer')
+        }
+        color={
+          user.roleId 
+            ? 'primary'
+            : (user.role === 'admin' ? 'error' : user.role === 'manager' ? 'warning' : user.role === 'operator' ? 'info' : 'default')
+        }
         size="small"
       />
     </TableCell>
@@ -88,7 +112,7 @@ const UserRow = React.memo(({ user, currentUser, onEdit, onDelete, onDeviceAcces
             <EditIcon />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Grant Device Group Access">
+        <Tooltip title="Manage Device Group Access">
           <IconButton size="small" onClick={() => onGroupAccess(user)}>
             <GroupIcon />
           </IconButton>
@@ -164,7 +188,7 @@ const GroupCard = React.memo(({ group, onEdit, onDelete, onManageDevices }) => (
 const UserManagement = () => {
   const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
-  const [data, setData] = useState({ users: [], deviceGroups: [], devices: [] });
+  const [data, setData] = useState({ users: [], deviceGroups: [], devices: [], userGroupAccess: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -196,7 +220,13 @@ const UserManagement = () => {
     },
     group: { name: '', description: '', color: '#1976d2' },
     deviceAccess: { deviceId: '', accessLevel: 'read', expiresAt: '' },
-    groupAccess: { groupId: '', accessLevel: 'read', expiresAt: '' },
+    groupAccess: { 
+      groupId: '', 
+      accessLevel: 'read', 
+      expiresAt: '', 
+      notes: '',
+      selectedGroups: []
+    },
     groupDevice: { deviceId: '' }
   });
 
@@ -214,12 +244,45 @@ const UserManagement = () => {
     { value: 'user-management', label: 'User Management' }
   ], []);
 
-  const roles = useMemo(() => [
+  // Fetch roles from API
+  const [roles, setRoles] = useState([
     { value: 'admin', label: 'Administrator', color: 'error' },
     { value: 'manager', label: 'Manager', color: 'warning' },
     { value: 'operator', label: 'Operator', color: 'info' },
     { value: 'viewer', label: 'Viewer', color: 'default' }
-  ], []);
+  ]);
+
+  // Load roles from API
+  const loadRoles = useCallback(async () => {
+    try {
+      const response = await authenticatedFetch('/api/roles');
+      if (response.ok) {
+        const apiRoles = await response.json();
+        // Combine template roles with custom roles
+        const templateRoles = [
+          { value: 'admin', label: 'Administrator', color: 'error' },
+          { value: 'manager', label: 'Manager', color: 'warning' },
+          { value: 'operator', label: 'Operator', color: 'info' },
+          { value: 'viewer', label: 'Viewer', color: 'default' }
+        ];
+        
+        const customRoles = apiRoles.map(role => ({
+          value: role.id.toString(), // Use role ID as value for custom roles
+          label: role.name,
+          color: 'primary',
+          isCustom: true
+        }));
+        
+        setRoles([...templateRoles, ...customRoles]);
+      }
+    } catch (error) {
+      console.error('Error loading roles:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRoles();
+  }, [loadRoles]);
 
   const accessLevels = useMemo(() => [
     { value: 'read', label: 'Read Only', color: 'default' },
@@ -228,17 +291,10 @@ const UserManagement = () => {
   ], []);
 
   // Helper functions
-  // const getAuthHeaders = () => {
-//   return {
-//     'Content-Type': 'application/json'
-//   };
-// };
-
-  // Define fetchUsers before loadData
   const fetchUsers = useCallback(async () => {
     try {
       const response = await fetch(`${BASE_URL}/api/users`, {
-        credentials: 'include' // Include cookies in the request
+        credentials: 'include'
       });
       
       if (response.ok) {
@@ -260,13 +316,14 @@ const UserManagement = () => {
       setLoading(true);
       setError('');
       
-      const [usersRes, groupsRes, devicesRes] = await Promise.all([
+      const [usersRes, groupsRes, devicesRes, accessRes] = await Promise.all([
         fetchUsers(),
         authenticatedFetch(`/api/device-groups`).catch(err => ({ ok: false, error: err })),
-        authenticatedFetch(`/api/devices`).catch(err => ({ ok: false, error: err }))
+        authenticatedFetch(`/api/devices`).catch(err => ({ ok: false, error: err })),
+        apiFetchUserDeviceGroupAccess().catch(err => ({ ok: false, error: err }))
       ]);
 
-      const newData = { users: [], deviceGroups: [], devices: [] };
+      const newData = { users: [], deviceGroups: [], devices: [], userGroupAccess: [] };
 
       if (usersRes.ok) {
         newData.users = usersRes.data;
@@ -278,6 +335,10 @@ const UserManagement = () => {
       
       if (devicesRes.ok) {
         newData.devices = await devicesRes.json();
+      }
+
+      if (accessRes && !accessRes.error) {
+        newData.userGroupAccess = accessRes;
       }
 
       setData(newData);
@@ -293,7 +354,7 @@ const UserManagement = () => {
     loadData();
   }, [loadData]);
 
-  // Form handlers - Define these before useEffect hooks that use them
+  // Form handlers
   const resetForm = useCallback((formType) => {
     const defaultForms = {
       user: {
@@ -307,95 +368,96 @@ const UserManagement = () => {
       },
       group: { name: '', description: '', color: '#1976d2' },
       deviceAccess: { deviceId: '', accessLevel: 'read', expiresAt: '' },
-      groupAccess: { groupId: '', accessLevel: 'read', expiresAt: '' },
+      groupAccess: { 
+        groupId: '', 
+        accessLevel: 'read', 
+        expiresAt: '', 
+        notes: '',
+        selectedGroups: []
+      },
       groupDevice: { deviceId: '' }
     };
-    setForms(prev => ({ ...prev, [formType]: defaultForms[formType] }));
-  }, []);
 
-  // Populate form when editing a user
-  useEffect(() => {
-    if (selectedItems.user) {
-      // Populate form with existing user data
-      setForms(prev => ({
-        ...prev,
-        user: {
-          username: selectedItems.user.username || '',
-          email: selectedItems.user.email || '',
-          password: '', // Don't populate password for security
-          firstName: selectedItems.user.firstName || '',
-          lastName: selectedItems.user.lastName || '',
-          role: selectedItems.user.role || 'viewer',
-          permissions: selectedItems.user.permissions || { menus: ['dashboard'], devices: [], deviceGroups: [] }
-        }
-      }));
-    } else {
-      // Reset form when not editing
-      resetForm('user');
-    }
-  }, [selectedItems.user, resetForm]);
-
-  // Populate form when editing a device group
-  useEffect(() => {
-    if (selectedItems.group) {
-      // Populate form with existing group data
-      setForms(prev => ({
-        ...prev,
-        group: {
-          name: selectedItems.group.name || '',
-          description: selectedItems.group.description || '',
-          color: selectedItems.group.color || '#1976d2'
-        }
-      }));
-    } else {
-      // Reset form when not editing
-      resetForm('group');
-    }
-  }, [selectedItems.group, resetForm]);
-
-  // Dialog handlers
-  const openDialog = useCallback((dialogType, item = null) => {
-    setDialogs(prev => ({ ...prev, [dialogType]: true }));
-    
-    // Map dialog types to selectedItems keys
-    let selectedItemKey = dialogType;
-    if (dialogType === 'userForGroupAccess') {
-      selectedItemKey = 'userForGroupAccess';
-    } else if (dialogType === 'groupManagement') {
-      selectedItemKey = 'group';
-    }
-    
-    setSelectedItems(prev => ({ ...prev, [selectedItemKey]: item }));
-  }, []);
-
-  const closeDialog = useCallback((dialogType) => {
-    setDialogs(prev => ({ ...prev, [dialogType]: false }));
-    setSelectedItems(prev => ({ ...prev, [dialogType === 'userForGroupAccess' ? 'userForGroupAccess' : dialogType]: null }));
-  }, []);
-
-  // Form handlers
-  const updateForm = useCallback((formType, updates) => {
     setForms(prev => ({
       ...prev,
-      [formType]: { ...prev[formType], ...updates }
+      [formType]: defaultForms[formType]
     }));
   }, []);
 
-  // Action handlers
+  const openDialog = useCallback((dialogType, item = null) => {
+    setSelectedItems(prev => ({
+      ...prev,
+      [dialogType === 'user' ? 'user' : dialogType === 'group' ? 'group' : 'userForGroupAccess']: item
+    }));
+
+    if (item) {
+      if (dialogType === 'user') {
+        setForms(prev => ({
+          ...prev,
+          user: {
+            username: item.username,
+            email: item.email,
+            password: '',
+            firstName: item.firstName,
+            lastName: item.lastName,
+            role: item.roleId ? item.roleId.toString() : item.role, // Use roleId for custom roles, role for template roles
+            permissions: item.permissions || { menus: ['dashboard'], devices: [], deviceGroups: [] }
+          }
+        }));
+      } else if (dialogType === 'group') {
+        setForms(prev => ({
+          ...prev,
+          group: {
+            name: item.name,
+            description: item.description || '',
+            color: item.color
+          }
+        }));
+      }
+    } else {
+      resetForm(dialogType === 'user' ? 'user' : 'group');
+    }
+
+    setDialogs(prev => ({ ...prev, [dialogType]: true }));
+  }, [resetForm]);
+
+  const closeDialog = useCallback((dialogType) => {
+    setDialogs(prev => ({ ...prev, [dialogType]: false }));
+    setSelectedItems(prev => ({
+      ...prev,
+      [dialogType === 'user' ? 'user' : dialogType === 'group' ? 'group' : 'userForGroupAccess']: null
+    }));
+    resetForm(dialogType === 'user' ? 'user' : 'group');
+  }, [resetForm]);
+
+  // User form handlers
   const handleUserSubmit = useCallback(async () => {
     try {
       const url = selectedItems.user ? `${BASE_URL}/api/users/${selectedItems.user.id}` : `${BASE_URL}/api/users`;
       const method = selectedItems.user ? 'PUT' : 'POST';
       
+      // Prepare user data based on role type
+      const userData = { ...forms.user };
+      
+      // Check if the selected role is a custom role (has isCustom flag)
+      const selectedRole = roles.find(r => r.value === forms.user.role);
+      if (selectedRole && selectedRole.isCustom) {
+        // For custom roles, send roleId and set role to null
+        userData.roleId = parseInt(forms.user.role);
+        userData.role = null; // Clear the role enum
+      } else {
+        // For template roles, send role and clear roleId
+        userData.roleId = null; // Clear any existing roleId
+      }
+      
       const response = await authenticatedFetch(url, {
         method,
-        body: JSON.stringify(forms.user)
+        body: JSON.stringify(userData)
       });
 
       if (response.ok) {
         setSuccess(selectedItems.user ? 'User updated successfully' : 'User created successfully');
         closeDialog('user');
-        resetForm('user');
         loadData();
       } else {
         const error = await response.json();
@@ -404,8 +466,9 @@ const UserManagement = () => {
     } catch (error) {
       setError('Failed to save user');
     }
-  }, [fetchUsers]);
+  }, [selectedItems.user, forms.user, roles, closeDialog, loadData]);
 
+  // Group form handlers
   const handleGroupSubmit = useCallback(async () => {
     try {
       const url = selectedItems.group ? `${BASE_URL}/api/device-groups/${selectedItems.group.id}` : `${BASE_URL}/api/device-groups`;
@@ -419,7 +482,6 @@ const UserManagement = () => {
       if (response.ok) {
         setSuccess(selectedItems.group ? 'Group updated successfully' : 'Group created successfully');
         closeDialog('group');
-        resetForm('group');
         loadData();
       } else {
         const error = await response.json();
@@ -428,8 +490,52 @@ const UserManagement = () => {
     } catch (error) {
       setError('Failed to save group');
     }
-  }, [fetchUsers]);
+  }, [selectedItems.group, forms.group, closeDialog, loadData]);
 
+  // Device Group Access handlers
+  const handleGroupAccessSubmit = useCallback(async () => {
+    try {
+      const { selectedGroups, accessLevel, expiresAt, notes } = forms.groupAccess;
+      
+      if (selectedGroups.length === 0) {
+        setError('Please select at least one device group');
+        return;
+      }
+
+      const results = [];
+      const errors = [];
+
+      for (const groupId of selectedGroups) {
+        try {
+          await apiGrantUserDeviceGroupAccess({
+            userId: selectedItems.userForGroupAccess.id,
+            groupId,
+            accessLevel,
+            expiresAt: expiresAt || null,
+            notes: notes || null
+          });
+          results.push({ groupId, success: true });
+        } catch (error) {
+          errors.push({ groupId, error: error.message });
+        }
+      }
+
+      if (results.length > 0) {
+        setSuccess(`Successfully granted access to ${results.length} group(s)`);
+        if (errors.length > 0) {
+          setError(`Failed to grant access to ${errors.length} group(s)`);
+        }
+        closeDialog('groupAccess');
+        loadData();
+      } else {
+        setError('Failed to grant access to any groups');
+      }
+    } catch (error) {
+      setError('Failed to grant group access');
+    }
+  }, [forms.groupAccess, selectedItems.userForGroupAccess, closeDialog, loadData]);
+
+  // Delete handlers
   const handleDeleteUser = useCallback(async (userId) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     
@@ -447,7 +553,7 @@ const UserManagement = () => {
     } catch (error) {
       setError('Failed to delete user');
     }
-  }, [fetchUsers]);
+  }, [loadData]);
 
   const handleDeleteGroup = useCallback(async (groupId) => {
     if (!window.confirm('Are you sure you want to delete this group?')) return;
@@ -466,7 +572,24 @@ const UserManagement = () => {
     } catch (error) {
       setError('Failed to delete group');
     }
-  }, [fetchUsers]);
+  }, [loadData]);
+
+  const handleRevokeGroupAccess = useCallback(async (accessId) => {
+    if (!window.confirm('Are you sure you want to revoke this access?')) return;
+    
+    try {
+      await apiRevokeUserDeviceGroupAccess(accessId);
+      setSuccess('Access revoked successfully');
+      loadData();
+    } catch (error) {
+      setError('Failed to revoke access');
+    }
+  }, [loadData]);
+
+  // Get user's current group access
+  const getUserGroupAccess = useCallback((userId) => {
+    return data.userGroupAccess.filter(access => access.userId === userId);
+  }, [data.userGroupAccess]);
 
   if (loading) {
     return (
@@ -501,8 +624,9 @@ const UserManagement = () => {
 
       <Paper sx={{ mb: 3 }}>
         <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
-          <Tab icon={<PersonIcon />} label="Users" />
-          <Tab icon={<GroupIcon />} label="Device Groups" />
+          <Tab label="Users" />
+          <Tab label="Device Groups" />
+          <Tab label="Group Access Management" />
         </Tabs>
       </Paper>
 
@@ -540,14 +664,9 @@ const UserManagement = () => {
                     currentUser={currentUser}
                     onEdit={(user) => openDialog('user', user)}
                     onDelete={handleDeleteUser}
-                    onDeviceAccess={(user) => {
-                      setSelectedItems(prev => ({ ...prev, user: user }));
-                      setDialogs(prev => ({ ...prev, deviceAccess: true }));
-                    }}
-                    onGroupAccess={(user) => {
-                      setSelectedItems(prev => ({ ...prev, userForGroupAccess: user }));
-                      setDialogs(prev => ({ ...prev, groupAccess: true }));
-                    }}
+                    onDeviceAccess={(user) => openDialog('deviceAccess', user)}
+                    onGroupAccess={(user) => openDialog('groupAccess', user)}
+                    roles={roles}
                   />
                 ))}
               </TableBody>
@@ -584,68 +703,140 @@ const UserManagement = () => {
         </Paper>
       )}
 
+      {/* Group Access Management Tab */}
+      {activeTab === 2 && (
+        <Paper>
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Device Group Access Management
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Manage which users have access to which device groups
+            </Typography>
+            
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>User</TableCell>
+                    <TableCell>Device Group</TableCell>
+                    <TableCell>Access Level</TableCell>
+                    <TableCell>Granted By</TableCell>
+                    <TableCell>Expires</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data.userGroupAccess.map((access) => (
+                    <TableRow key={access.id}>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar sx={{ mr: 2, width: 32, height: 32 }}>
+                            <PersonIcon />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="subtitle2">
+                              {access.user?.firstName} {access.user?.lastName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              @{access.user?.username}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box
+                            sx={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: '50%',
+                              backgroundColor: access.group?.color,
+                              mr: 1
+                            }}
+                          />
+                          {access.group?.name}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={access.accessLevel}
+                          size="small"
+                          color={access.accessLevel === 'admin' ? 'error' : access.accessLevel === 'write' ? 'info' : 'default'}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {access.grantedByUser?.firstName} {access.grantedByUser?.lastName}
+                      </TableCell>
+                      <TableCell>
+                        {access.expiresAt ? new Date(access.expiresAt).toLocaleDateString() : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="Revoke Access">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleRevokeGroupAccess(access.id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        </Paper>
+      )}
+
       {/* User Dialog */}
-      <Dialog 
-        open={dialogs.user} 
-        onClose={() => closeDialog('user')} 
-        maxWidth="md" 
-        fullWidth
-      >
+      <Dialog open={dialogs.user} onClose={() => closeDialog('user')} maxWidth="md" fullWidth>
         <DialogTitle>
           {selectedItems.user ? 'Edit User' : 'Add New User'}
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Username"
                 value={forms.user.username}
-                onChange={(e) => updateForm('user', { username: e.target.value })}
-                disabled={!!selectedItems.user}
+                onChange={(e) => setForms(prev => ({ ...prev, user: { ...prev.user, username: e.target.value } }))}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Email"
                 type="email"
                 value={forms.user.email}
-                onChange={(e) => updateForm('user', { email: e.target.value })}
+                onChange={(e) => setForms(prev => ({ ...prev, user: { ...prev.user, email: e.target.value } }))}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="First Name"
                 value={forms.user.firstName}
-                onChange={(e) => updateForm('user', { firstName: e.target.value })}
+                onChange={(e) => setForms(prev => ({ ...prev, user: { ...prev.user, firstName: e.target.value } }))}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Last Name"
                 value={forms.user.lastName}
-                onChange={(e) => updateForm('user', { lastName: e.target.value })}
+                onChange={(e) => setForms(prev => ({ ...prev, user: { ...prev.user, lastName: e.target.value } }))}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Password"
-                type="password"
-                value={forms.user.password}
-                onChange={(e) => updateForm('user', { password: e.target.value })}
-                helperText={selectedItems.user ? 'Leave blank to keep current password' : ''}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
                 <InputLabel>Role</InputLabel>
                 <Select
                   value={forms.user.role}
-                  onChange={(e) => updateForm('user', { role: e.target.value })}
+                  onChange={(e) => setForms(prev => ({ ...prev, user: { ...prev.user, role: e.target.value } }))}
                   label="Role"
                 >
                   {roles.map((role) => (
@@ -656,39 +847,15 @@ const UserManagement = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                Menu Permissions
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Select which menus this user can access
-              </Typography>
-              <Grid container spacing={2}>
-                {availableMenus.map((menu) => (
-                  <Grid item xs={12} sm={6} md={4} key={menu.value}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={forms.user.permissions?.menus?.includes(menu.value) || false}
-                          onChange={(e) => {
-                            const currentMenus = forms.user.permissions?.menus || [];
-                            const newMenus = e.target.checked
-                              ? [...currentMenus, menu.value]
-                              : currentMenus.filter(m => m !== menu.value);
-                            updateForm('user', {
-                              permissions: {
-                                ...forms.user.permissions,
-                                menus: newMenus
-                              }
-                            });
-                          }}
-                        />
-                      }
-                      label={menu.label}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Password"
+                type="password"
+                value={forms.user.password}
+                onChange={(e) => setForms(prev => ({ ...prev, user: { ...prev.user, password: e.target.value } }))}
+                helperText={selectedItems.user ? 'Leave blank to keep current password' : ''}
+              />
             </Grid>
           </Grid>
         </DialogContent>
@@ -701,12 +868,7 @@ const UserManagement = () => {
       </Dialog>
 
       {/* Group Dialog */}
-      <Dialog 
-        open={dialogs.group} 
-        onClose={() => closeDialog('group')} 
-        maxWidth="sm" 
-        fullWidth
-      >
+      <Dialog open={dialogs.group} onClose={() => closeDialog('group')} maxWidth="sm" fullWidth>
         <DialogTitle>
           {selectedItems.group ? 'Edit Device Group' : 'Add New Device Group'}
         </DialogTitle>
@@ -717,7 +879,7 @@ const UserManagement = () => {
                 fullWidth
                 label="Group Name"
                 value={forms.group.name}
-                onChange={(e) => updateForm('group', { name: e.target.value })}
+                onChange={(e) => setForms(prev => ({ ...prev, group: { ...prev.group, name: e.target.value } }))}
               />
             </Grid>
             <Grid item xs={12}>
@@ -727,7 +889,7 @@ const UserManagement = () => {
                 multiline
                 rows={3}
                 value={forms.group.description}
-                onChange={(e) => updateForm('group', { description: e.target.value })}
+                onChange={(e) => setForms(prev => ({ ...prev, group: { ...prev.group, description: e.target.value } }))}
               />
             </Grid>
             <Grid item xs={12}>
@@ -736,7 +898,7 @@ const UserManagement = () => {
                 label="Color"
                 type="color"
                 value={forms.group.color}
-                onChange={(e) => updateForm('group', { color: e.target.value })}
+                onChange={(e) => setForms(prev => ({ ...prev, group: { ...prev.group, color: e.target.value } }))}
               />
             </Grid>
           </Grid>
@@ -749,309 +911,170 @@ const UserManagement = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Device Access Dialog */}
-      <Dialog 
-        open={dialogs.deviceAccess} 
-        onClose={() => closeDialog('deviceAccess')} 
-        maxWidth="sm" 
-        fullWidth
-      >
-        <DialogTitle>
-          Grant Device Access to {selectedItems.user?.firstName} {selectedItems.user?.lastName}
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Device</InputLabel>
-                <Select
-                  value={forms.deviceAccess.deviceId}
-                  onChange={(e) => updateForm('deviceAccess', { deviceId: e.target.value })}
-                  label="Device"
-                >
-                  {data.devices.map((device) => (
-                    <MenuItem key={device.id} value={device.id}>
-                      {device.name || device.imei} ({device.imei})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Access Level</InputLabel>
-                <Select
-                  value={forms.deviceAccess.accessLevel}
-                  onChange={(e) => updateForm('deviceAccess', { accessLevel: e.target.value })}
-                  label="Access Level"
-                >
-                  {accessLevels.map((level) => (
-                    <MenuItem key={level.value} value={level.value}>
-                      {level.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Expires At (Optional)"
-                type="datetime-local"
-                value={forms.deviceAccess.expiresAt}
-                onChange={(e) => updateForm('deviceAccess', { expiresAt: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => closeDialog('deviceAccess')}>Cancel</Button>
-          <Button 
-            onClick={async () => {
-              try {
-                const response = await authenticatedFetch(`/api/users/${selectedItems.user.id}/devices`, {
-                  method: 'POST',
-                  body: JSON.stringify(forms.deviceAccess)
-                });
-
-                if (response.ok) {
-                  setSuccess('Device access granted successfully');
-                  closeDialog('deviceAccess');
-                  resetForm('deviceAccess');
-                  loadData();
-                } else {
-                  const error = await response.json();
-                  setError(error.error || 'Failed to grant device access');
-                }
-              } catch (error) {
-                setError('Failed to grant device access');
-              }
-            }} 
-            variant="contained"
-            disabled={!forms.deviceAccess.deviceId}
-          >
-            Grant Access
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Group Access Dialog */}
-      <Dialog 
-        open={dialogs.groupAccess} 
-        onClose={() => closeDialog('groupAccess')} 
-        maxWidth="sm" 
-        fullWidth
-      >
+      <Dialog open={dialogs.groupAccess} onClose={() => closeDialog('groupAccess')} maxWidth="md" fullWidth>
         <DialogTitle>
-          Grant Device Group Access to {selectedItems.userForGroupAccess?.firstName} {selectedItems.userForGroupAccess?.lastName}
+          Manage Device Group Access - {selectedItems.userForGroupAccess?.firstName} {selectedItems.userForGroupAccess?.lastName}
         </DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Device Group</InputLabel>
-                <Select
-                  value={forms.groupAccess.groupId}
-                  onChange={(e) => updateForm('groupAccess', { groupId: e.target.value })}
-                  label="Device Group"
-                >
-                  {data.deviceGroups.map((group) => (
-                    <MenuItem key={group.id} value={group.id}>
-                      {group.name} ({group.devices?.length || 0} devices)
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Current Access
+            </Typography>
+            <List dense>
+              {getUserGroupAccess(selectedItems.userForGroupAccess?.id).map((access) => (
+                <ListItem key={access.id}>
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            backgroundColor: access.group?.color,
+                            mr: 1
+                          }}
+                        />
+                        {access.group?.name}
+                      </Box>
+                    }
+                    secondary={`${access.accessLevel} access - Granted by ${access.grantedByUser?.firstName} ${access.grantedByUser?.lastName}`}
+                  />
+                  <ListItemSecondaryAction>
+                    <Tooltip title="Revoke Access">
+                      <IconButton
+                        edge="end"
+                        size="small"
+                        color="error"
+                        onClick={() => handleRevokeGroupAccess(access.id)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+              {getUserGroupAccess(selectedItems.userForGroupAccess?.id).length === 0 && (
+                <ListItem>
+                  <ListItemText
+                    primary="No device group access"
+                    secondary="This user has no access to any device groups"
+                  />
+                </ListItem>
+              )}
+            </List>
+
+            <Divider sx={{ my: 3 }} />
+
+            <Typography variant="h6" gutterBottom>
+              Grant New Access
+            </Typography>
+            
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Access Level</InputLabel>
+                  <Select
+                    value={forms.groupAccess.accessLevel}
+                    onChange={(e) => setForms(prev => ({ 
+                      ...prev, 
+                      groupAccess: { ...prev.groupAccess, accessLevel: e.target.value } 
+                    }))}
+                    label="Access Level"
+                  >
+                    {accessLevels.map((level) => (
+                      <MenuItem key={level.value} value={level.value}>
+                        {level.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Expires At (Optional)"
+                  type="datetime-local"
+                  value={forms.groupAccess.expiresAt}
+                  onChange={(e) => setForms(prev => ({ 
+                    ...prev, 
+                    groupAccess: { ...prev.groupAccess, expiresAt: e.target.value } 
+                  }))}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Notes (Optional)"
+                  multiline
+                  rows={2}
+                  value={forms.groupAccess.notes}
+                  onChange={(e) => setForms(prev => ({ 
+                    ...prev, 
+                    groupAccess: { ...prev.groupAccess, notes: e.target.value } 
+                  }))}
+                />
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Select Device Groups
+                </Typography>
+                <FormGroup>
+                  {data.deviceGroups
+                    .filter(group => !getUserGroupAccess(selectedItems.userForGroupAccess?.id)
+                      .some(access => access.groupId === group.id))
+                    .map((group) => (
+                      <FormControlLabel
+                        key={group.id}
+                        control={
+                          <Checkbox
+                            checked={forms.groupAccess.selectedGroups.includes(group.id)}
+                            onChange={(e) => {
+                              const newSelected = e.target.checked
+                                ? [...forms.groupAccess.selectedGroups, group.id]
+                                : forms.groupAccess.selectedGroups.filter(id => id !== group.id);
+                              setForms(prev => ({
+                                ...prev,
+                                groupAccess: { ...prev.groupAccess, selectedGroups: newSelected }
+                              }));
+                            }}
+                          />
+                        }
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                backgroundColor: group.color,
+                                mr: 1
+                              }}
+                            />
+                            {group.name}
+                          </Box>
+                        }
+                      />
+                    ))}
+                </FormGroup>
+              </Grid>
             </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Access Level</InputLabel>
-                <Select
-                  value={forms.groupAccess.accessLevel}
-                  onChange={(e) => updateForm('groupAccess', { accessLevel: e.target.value })}
-                  label="Access Level"
-                >
-                  {accessLevels.map((level) => (
-                    <MenuItem key={level.value} value={level.value}>
-                      {level.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Expires At (Optional)"
-                type="datetime-local"
-                value={forms.groupAccess.expiresAt}
-                onChange={(e) => updateForm('groupAccess', { expiresAt: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-          </Grid>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => closeDialog('groupAccess')}>Cancel</Button>
           <Button 
-            onClick={async () => {
-              try {
-                const response = await authenticatedFetch(`/api/users/${selectedItems.userForGroupAccess.id}/device-groups`, {
-                  method: 'POST',
-                  body: JSON.stringify(forms.groupAccess)
-                });
-
-                if (response.ok) {
-                  const result = await response.json();
-                  setSuccess(result.message || 'Device group access granted successfully');
-                  closeDialog('groupAccess');
-                  resetForm('groupAccess');
-                  loadData();
-                } else {
-                  const error = await response.json();
-                  setError(error.error || 'Failed to grant device group access');
-                }
-              } catch (error) {
-                setError('Failed to grant device group access');
-              }
-            }} 
+            onClick={handleGroupAccessSubmit} 
             variant="contained"
-            disabled={!forms.groupAccess.groupId}
+            disabled={forms.groupAccess.selectedGroups.length === 0}
           >
             Grant Access
           </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Group Management Dialog */}
-      <Dialog 
-        open={dialogs.groupManagement} 
-        onClose={() => closeDialog('groupManagement')} 
-        maxWidth="md" 
-        fullWidth
-      >
-        <DialogTitle>
-          Manage Devices in "{selectedItems.group?.name}" Group
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" gutterBottom>
-                Current Devices ({selectedItems.group?.devices?.length || 0})
-              </Typography>
-              {selectedItems.group?.devices && selectedItems.group.devices.length > 0 ? (
-                <Box sx={{ mb: 2 }}>
-                  {selectedItems.group.devices.map((device) => (
-                    <Chip
-                      key={device.id}
-                      label={`${device.name || device.imei} (${device.imei})`}
-                      onDelete={async () => {
-                        try {
-                          const response = await authenticatedFetch(`/api/device-groups/${selectedItems.group.id}/devices/${device.id}`, {
-                            method: 'DELETE'
-                          });
-
-                          if (response.ok) {
-                            setSuccess('Device removed from group successfully');
-                            loadData();
-                            // Update the selected group with the new device list
-                            const updatedGroup = { ...selectedItems.group };
-                            updatedGroup.devices = updatedGroup.devices.filter(d => d.id !== device.id);
-                            setSelectedItems(prev => ({ ...prev, group: updatedGroup }));
-                          } else {
-                            const error = await response.json();
-                            setError(error.error || 'Failed to remove device from group');
-                          }
-                        } catch (error) {
-                          setError('Failed to remove device from group');
-                        }
-                      }}
-                      sx={{ mr: 1, mb: 1 }}
-                      color="primary"
-                      variant="outlined"
-                    />
-                  ))}
-                </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  No devices in this group
-                </Typography>
-              )}
-              
-              <Divider sx={{ my: 2 }} />
-              
-              <Typography variant="subtitle2" gutterBottom>
-                Add Device to Group
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={8}>
-                  <FormControl fullWidth>
-                    <InputLabel>Select Device</InputLabel>
-                    <Select
-                      value={forms.groupDevice.deviceId}
-                      onChange={(e) => updateForm('groupDevice', { deviceId: e.target.value })}
-                      label="Select Device"
-                    >
-                      {data.devices
-                        .filter(device => !selectedItems.group?.devices?.some(groupDevice => groupDevice.id === device.id))
-                        .map((device) => (
-                          <MenuItem key={device.id} value={device.id}>
-                            {device.name || device.imei} ({device.imei})
-                          </MenuItem>
-                        ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    onClick={async () => {
-                      console.log('Add Device button clicked');
-                      console.log('selectedItems.group:', selectedItems.group);
-                      console.log('forms.groupDevice.deviceId:', forms.groupDevice.deviceId);
-                      
-                      try {
-                        const response = await authenticatedFetch(`/api/device-groups/${selectedItems.group.id}/devices`, {
-                          method: 'POST',
-                          body: JSON.stringify({ deviceId: forms.groupDevice.deviceId })
-                        });
-
-                        console.log('API response:', response);
-
-                        if (response.ok) {
-                          setSuccess('Device added to group successfully');
-                          resetForm('groupDevice');
-                          loadData();
-                          // Update the selected group with the new device list
-                          const addedDevice = data.devices.find(d => d.id === forms.groupDevice.deviceId);
-                          if (addedDevice) {
-                            const updatedGroup = { ...selectedItems.group };
-                            updatedGroup.devices = [...(updatedGroup.devices || []), addedDevice];
-                            setSelectedItems(prev => ({ ...prev, group: updatedGroup }));
-                          }
-                        } else {
-                          const error = await response.json();
-                          console.log('API error:', error);
-                          setError(error.error || 'Failed to add device to group');
-                        }
-                      } catch (error) {
-                        console.log('Exception caught:', error);
-                        setError('Failed to add device to group');
-                      }
-                    }}
-                    disabled={!forms.groupDevice.deviceId}
-                  >
-                    Add Device
-                  </Button>
-                </Grid>
-              </Grid>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => closeDialog('groupManagement')}>Close</Button>
         </DialogActions>
       </Dialog>
     </Container>

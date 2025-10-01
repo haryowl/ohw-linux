@@ -25,7 +25,15 @@ router.post('/login', async (req, res) => {
         // Find user
         const user = await User.findOne({ 
             where: { username, isActive: true },
-            attributes: ['id', 'username', 'password', 'firstName', 'lastName', 'role', 'permissions']
+            attributes: ['id', 'username', 'password', 'firstName', 'lastName', 'role', 'roleId', 'permissions'],
+            include: [
+                {
+                    model: require('../models').Role,
+                    as: 'userRole',
+                    attributes: ['id', 'name', 'description', 'permissions'],
+                    required: false
+                }
+            ]
         });
         
         if (!user) {
@@ -46,13 +54,24 @@ router.post('/login', async (req, res) => {
         await sessionStore.deleteByUserId(user.id);
         logger.info('Cleared existing sessions for user', { username: user.username });
         
+        // Determine which permissions to use
+        let effectivePermissions = user.permissions;
+        let effectiveRole = user.role;
+        
+        // If user has a custom role, use the custom role's permissions
+        if (user.roleId && user.userRole) {
+            effectivePermissions = user.userRole.permissions;
+            effectiveRole = user.userRole.name;
+        }
+        
         // Generate session token
         const token = generateToken();
         const session = {
             userId: user.id,
             username: user.username,
-            role: user.role,
-            permissions: user.permissions,
+            role: effectiveRole,
+            roleId: user.roleId,
+            permissions: effectivePermissions,
             createdAt: new Date()
         };
         
@@ -90,8 +109,9 @@ router.post('/login', async (req, res) => {
             username: user.username,
             firstName: user.firstName,
             lastName: user.lastName,
-            role: user.role,
-            permissions: user.permissions
+            role: effectiveRole,
+            roleId: user.roleId,
+            permissions: effectivePermissions
         };
         
         logger.info('User logged in successfully', { 
@@ -141,11 +161,29 @@ router.get('/check', requireAuth, async (req, res) => {
     try {
         // Get user data from database to ensure we have the latest info
         const user = await User.findByPk(req.user.userId, {
-            attributes: ['id', 'username', 'firstName', 'lastName', 'role', 'permissions', 'isActive']
+            attributes: ['id', 'username', 'firstName', 'lastName', 'role', 'roleId', 'permissions', 'isActive'],
+            include: [
+                {
+                    model: require('../models').Role,
+                    as: 'userRole',
+                    attributes: ['id', 'name', 'description', 'permissions'],
+                    required: false
+                }
+            ]
         });
         
         if (!user || !user.isActive) {
             return res.status(401).json({ error: 'User not found or inactive' });
+        }
+        
+        // Determine which permissions to use
+        let effectivePermissions = user.permissions;
+        let effectiveRole = user.role;
+        
+        // If user has a custom role, use the custom role's permissions
+        if (user.roleId && user.userRole) {
+            effectivePermissions = user.userRole.permissions;
+            effectiveRole = user.userRole.name;
         }
         
         const userData = {
@@ -153,8 +191,9 @@ router.get('/check', requireAuth, async (req, res) => {
             username: user.username,
             firstName: user.firstName,
             lastName: user.lastName,
-            role: user.role,
-            permissions: user.permissions
+            role: effectiveRole,
+            roleId: user.roleId,
+            permissions: effectivePermissions
         };
         
         res.json(userData);

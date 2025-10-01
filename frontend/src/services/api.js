@@ -93,6 +93,23 @@ export async function apiFetchDevices() {
   }
 }
 
+// Simple version that returns raw data (for consistency with device groups API)
+export async function apiFetchDevicesRaw() {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/devices`);
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.message || 'Failed to fetch devices');
+    }
+  } catch (error) {
+    console.error('Error fetching devices:', error);
+    throw error;
+  }
+}
+
 export async function updateDeviceMapping(deviceId, mapping) {
   const response = await authenticatedFetch(`${BASE_URL}/api/devices/${deviceId}/mapping`, {
     method: 'PUT',
@@ -186,6 +203,240 @@ export async function updateDataForwarderConfig(config) {
 export async function fetchDataForwarderLogs() {
   const response = await authenticatedFetch(`${BASE_URL}/api/settings/data-forwarder/logs`);
   return response;
+}
+
+// Device Group Management API Functions
+export async function apiFetchDeviceGroups() {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/device-groups`);
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to fetch device groups');
+    }
+  } catch (error) {
+    console.error('Error fetching device groups:', error);
+    throw error;
+  }
+}
+
+export async function apiCreateDeviceGroup(groupData) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/device-groups`, {
+      method: 'POST',
+      body: JSON.stringify(groupData),
+    });
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to create device group');
+    }
+  } catch (error) {
+    console.error('Error creating device group:', error);
+    throw error;
+  }
+}
+
+export async function apiUpdateDeviceGroup(groupId, groupData) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/device-groups/${groupId}`, {
+      method: 'PUT',
+      body: JSON.stringify(groupData),
+    });
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to update device group');
+    }
+  } catch (error) {
+    console.error('Error updating device group:', error);
+    throw error;
+  }
+}
+
+export async function apiDeleteDeviceGroup(groupId) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/device-groups/${groupId}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to delete device group');
+    }
+  } catch (error) {
+    console.error('Error deleting device group:', error);
+    throw error;
+  }
+}
+
+export async function apiAddDeviceToGroup(groupId, deviceId) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/device-groups/${groupId}/devices`, {
+      method: 'POST',
+      body: JSON.stringify({ deviceId }),
+    });
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to add device to group');
+    }
+  } catch (error) {
+    console.error('Error adding device to group:', error);
+    throw error;
+  }
+}
+
+export async function apiRemoveDeviceFromGroup(groupId, deviceId) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/device-groups/${groupId}/devices/${deviceId}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to remove device from group');
+    }
+  } catch (error) {
+    console.error('Error removing device from group:', error);
+    throw error;
+  }
+}
+
+// User Device Group Access API Functions
+export async function apiFetchUserDeviceGroupAccess() {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/user-device-group-access`);
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to fetch user device group access');
+    }
+  } catch (error) {
+    console.error('Error fetching user device group access:', error);
+    throw error;
+  }
+}
+
+export async function apiFetchUserDeviceGroupAccessByUser(userId) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/user-device-group-access/user/${userId}`);
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to fetch user device group access');
+    }
+  } catch (error) {
+    console.error('Error fetching user device group access:', error);
+    throw error;
+  }
+}
+
+export async function apiFetchUserDeviceGroupAccessByGroup(groupId) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/user-device-group-access/group/${groupId}`);
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to fetch device group access');
+    }
+  } catch (error) {
+    console.error('Error fetching device group access:', error);
+    throw error;
+  }
+}
+
+export async function apiGrantUserDeviceGroupAccess(accessData) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/user-device-group-access`, {
+      method: 'POST',
+      body: JSON.stringify(accessData),
+    });
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to grant user device group access');
+    }
+  } catch (error) {
+    console.error('Error granting user device group access:', error);
+    throw error;
+  }
+}
+
+export async function apiUpdateUserDeviceGroupAccess(accessId, accessData) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/user-device-group-access/${accessId}`, {
+      method: 'PUT',
+      body: JSON.stringify(accessData),
+    });
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to update user device group access');
+    }
+  } catch (error) {
+    console.error('Error updating user device group access:', error);
+    throw error;
+  }
+}
+
+export async function apiRevokeUserDeviceGroupAccess(accessId) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/user-device-group-access/${accessId}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to revoke user device group access');
+    }
+  } catch (error) {
+    console.error('Error revoking user device group access:', error);
+    throw error;
+  }
+}
+
+export async function apiBulkGrantUserDeviceGroupAccess(bulkData) {
+  try {
+    const response = await authenticatedFetch(`${BASE_URL}/api/user-device-group-access/bulk`, {
+      method: 'POST',
+      body: JSON.stringify(bulkData),
+    });
+    const data = await response.json();
+    
+    if (response.ok) {
+      return data;
+    } else {
+      throw new Error(data.error || 'Failed to bulk grant user device group access');
+    }
+  } catch (error) {
+    console.error('Error bulk granting user device group access:', error);
+    throw error;
+  }
 }
 
 // Add more API functions as needed

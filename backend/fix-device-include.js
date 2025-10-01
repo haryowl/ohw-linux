@@ -1,0 +1,1 @@
+const fs = require("fs");let content = fs.readFileSync("src/routes/records.js", "utf8");// Remove the problematic Device include that's causing the errorcontent = content.replace(/include: \[\{[\s\S]*?model: require\('\.\.\/models'\)\.Device[\s\S]*?\}\]/g, "");fs.writeFileSync("src/routes/records.js", content);console.log("Removed problematic Device include from export-sm"); 

@@ -115,9 +115,26 @@ export function AuthProvider({ children }) {
     if (user.role === 'admin') return true;
     
     const { permissions } = user;
-    if (!permissions || !permissions.menus) return false;
+    if (!permissions) return false;
     
-    return permissions.menus.includes(menuName.toLowerCase());
+    // Handle different permission structures
+    if (permissions.menus) {
+      // New structure: permissions.menus[menuName].access
+      if (typeof permissions.menus === 'object' && permissions.menus[menuName]) {
+        return permissions.menus[menuName].access === true;
+      }
+      // Old structure: permissions.menus array
+      if (Array.isArray(permissions.menus)) {
+        return permissions.menus.includes(menuName.toLowerCase());
+      }
+    }
+    
+    // Fallback: check if menu name is in permissions array (legacy)
+    if (Array.isArray(permissions)) {
+      return permissions.includes(menuName.toLowerCase());
+    }
+    
+    return false;
   };
 
   // Check if user has access to a specific device

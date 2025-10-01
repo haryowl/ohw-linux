@@ -45,6 +45,27 @@ module.exports = (sequelize) => {
       type: DataTypes.FLOAT,
       allowNull: true
     },
+    // Additional GPS fields
+    altitude: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      comment: 'GPS altitude in meters'
+    },
+    course: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      comment: 'GPS course/heading in degrees'
+    },
+    satellites: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'Number of GPS satellites used'
+    },
+    hdop: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      comment: 'Horizontal Dilution of Precision'
+    },
     status: {
       type: DataTypes.STRING,
       allowNull: true

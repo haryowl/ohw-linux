@@ -1,8 +1,6 @@
 // backend/src/models/index.js
 const { Sequelize } = require('sequelize');
-const config = require('../config');
 const logger = require('../utils/logger');
-const path = require('path');
 
 // Import model definitions
 const defineDevice = require('./device');
@@ -13,20 +11,19 @@ const defineAlert = require('./alert');
 const defineUser = require('./user');
 const defineDeviceGroup = require('./deviceGroup');
 const defineUserDeviceAccess = require('./userDeviceAccess');
+const defineUserDeviceGroupAccess = require('./userDeviceGroupAccess');
+const defineRole = require('./role');
 
-// Force production environment to use the correct database
-const env = 'production'; // Force production environment
-const dbConfig = config.database[env];
+// Database configuration
+const dbConfig = {
+    dialect: 'sqlite',
+    storage: process.env.NODE_ENV === 'production' 
+        ? './data/prod.sqlite' 
+        : './data/dev.sqlite',
+    logging: msg => logger.debug(msg)
+};
 
-// Ensure we have a valid database configuration
-if (!dbConfig) {
-    throw new Error(`Database configuration for environment "${env}" not found`);
-}
-
-console.log('Using database environment:', env);
-console.log('Database storage path:', dbConfig.storage);
-
-// Create Sequelize instance
+// Initialize Sequelize
 const sequelize = new Sequelize({
     ...dbConfig,
     logging: msg => logger.debug(msg)
@@ -41,21 +38,13 @@ const Alert = defineAlert(sequelize);
 const User = defineUser(sequelize);
 const DeviceGroup = defineDeviceGroup(sequelize);
 const UserDeviceAccess = defineUserDeviceAccess(sequelize);
+const UserDeviceGroupAccess = defineUserDeviceGroupAccess(sequelize);
+const Role = defineRole(sequelize);
 
 // Setup associations
 Device.hasMany(FieldMapping, {
     foreignKey: 'deviceId',
     as: 'mappings'
-});
-
-Device.hasMany(Record, {
-    foreignKey: 'deviceImei',
-    as: 'records'
-});
-
-Record.belongsTo(Device, {
-    foreignKey: 'deviceImei',
-    as: 'device'
 });
 
 AlertRule.hasMany(Alert, {
@@ -71,7 +60,12 @@ Alert.belongsTo(AlertRule, {
 // User Management Associations
 User.hasMany(UserDeviceAccess, {
     foreignKey: 'userId',
-    as: 'deviceAccess'
+    as: 'userDeviceAccess'
+});
+
+User.hasMany(UserDeviceGroupAccess, {
+    foreignKey: 'userId',
+    as: 'userGroupAccess'
 });
 
 User.hasMany(DeviceGroup, {
@@ -81,7 +75,7 @@ User.hasMany(DeviceGroup, {
 
 Device.hasMany(UserDeviceAccess, {
     foreignKey: 'deviceId',
-    as: 'userAccess'
+    as: 'deviceUserAccess'  // CHANGED: was 'userAccess'
 });
 
 Device.belongsTo(DeviceGroup, {
@@ -92,6 +86,11 @@ Device.belongsTo(DeviceGroup, {
 DeviceGroup.hasMany(Device, {
     foreignKey: 'groupId',
     as: 'devices'
+});
+
+DeviceGroup.hasMany(UserDeviceGroupAccess, {
+    foreignKey: 'groupId',
+    as: 'userGroupAccess'
 });
 
 DeviceGroup.belongsTo(User, {
@@ -114,6 +113,67 @@ UserDeviceAccess.belongsTo(User, {
     as: 'grantedByUser'
 });
 
+UserDeviceGroupAccess.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user'
+});
+
+UserDeviceGroupAccess.belongsTo(DeviceGroup, {
+    foreignKey: 'groupId',
+    as: 'group'
+});
+
+UserDeviceGroupAccess.belongsTo(User, {
+    foreignKey: 'grantedBy',
+    as: 'grantedByUser'
+});
+
+// Role Management Associations
+User.belongsTo(Role, {
+    foreignKey: 'roleId',
+    as: 'userRole'
+});
+
+Role.hasMany(User, {
+    foreignKey: 'roleId',
+    as: 'users'
+});
+
+Role.belongsTo(User, {
+    foreignKey: 'createdBy',
+    as: 'creator'
+});
+
+// Add user device access associations
+User.belongsToMany(Device, {
+    through: UserDeviceAccess,
+    foreignKey: 'userId',
+    otherKey: 'deviceId',
+    as: 'deviceAccess'
+});
+
+Device.belongsToMany(User, {
+    through: UserDeviceAccess,
+    foreignKey: 'deviceId',
+    otherKey: 'userId',
+    as: 'userAccess'
+});
+
+// Add user device group access associations
+User.belongsToMany(DeviceGroup, {
+    through: UserDeviceGroupAccess,
+    foreignKey: 'userId',
+    otherKey: 'groupId',
+    as: 'groupAccess'
+});
+
+DeviceGroup.belongsToMany(User, {
+    through: UserDeviceGroupAccess,
+    foreignKey: 'groupId',
+    otherKey: 'userId',
+    as: 'groupUserAccess'
+});
+
 // Export models and Sequelize instance
 module.exports = {
     sequelize,
@@ -124,5 +184,7 @@ module.exports = {
     Alert,
     User,
     DeviceGroup,
-    UserDeviceAccess
+    UserDeviceAccess,
+    UserDeviceGroupAccess,
+    Role
 };

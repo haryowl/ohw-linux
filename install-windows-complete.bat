@@ -187,6 +187,32 @@ if %errorLevel% neq 0 (
 echo [INFO] Creating admin user...
 call node create-default-admin.js
 
+echo [INFO] Initializing device groups...
+call node init-device-groups.js
+if %errorLevel% neq 0 (
+    echo [WARNING] Device groups initialization failed - this is not critical
+)
+
+echo [INFO] Adding user device group access table...
+call node add-user-device-group-access-migration.js
+if %errorLevel% neq 0 (
+    echo [WARNING] User device group access migration failed - this is not critical
+)
+
+echo [INFO] Adding role ID column to Users table...
+call node add-role-id-migration.js
+if %errorLevel% neq 0 (
+    echo [ERROR] Role ID migration failed
+    exit /b 1
+)
+
+echo [INFO] Initializing default roles...
+call node init-roles.js
+if %errorLevel% neq 0 (
+    echo [ERROR] Role initialization failed
+    exit /b 1
+)
+
 cd ..
 
 :: Step 7: Build frontend

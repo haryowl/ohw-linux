@@ -155,7 +155,8 @@ const Tracking = () => {
         endDate: endDate.toISOString()
       });
 
-      const url = `${BASE_URL}/api/data/${selectedDevice}/tracking?${params}`;
+      // Use the new IMEI-based endpoint that only requires read permission
+      const url = `${BASE_URL}/api/data/imei/${selectedDevice}/tracking?${params}`;
       console.log('Fetching tracking data from:', url);
 
       const response = await fetch(url, {

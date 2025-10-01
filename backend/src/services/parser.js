@@ -1,4 +1,4 @@
-// backend/src/services/parser.js
+﻿// backend/src/services/parser.js
 
 const EventEmitter = require('events');
 const tagDefinitions = require('./tagDefinitions');
@@ -16,14 +16,114 @@ class GalileoskyParser extends EventEmitter {
         this.maxPacketSize = config.parser.maxPacketSize;
         this.validateChecksum = config.parser.validateChecksum;
         
+        // Batch processing configuration
+        this.batchSize = 50; // Records per batch
+        this.batchTimeout = 2000; // 2 seconds timeout
+        this.recordBuffer = []; // Buffer for batch inserts
+        this.deviceQueues = new Map(); // Per-device processing queues
+        this.isProcessing = false; // Prevent concurrent batch processing
+        this.maxConcurrentDevices = 5; // Max devices processing simultaneously
+        this.processingDevices = new Set(); // Track devices currently processing
+        
         // Initialize caches
         this.tagDefinitionsCache = new Map();
         this.binaryCache = new Map();
         
         this.initializeCaches();
         this.initializeParsers();
+        this.startBatchProcessor();
     }
 
+
+    // Batch processing methods
+    startBatchProcessor() {
+        // Process batches every 2 seconds
+        setInterval(() => {
+            this.processBatch();
+        }, this.batchTimeout);
+        
+        logger.info('Batch processor started with batch size:', this.batchSize);
+    }
+
+    async processBatch() {
+        if (this.isProcessing || this.recordBuffer.length === 0) {
+            return;
+        }
+
+        this.isProcessing = true;
+        try {
+            const batch = this.recordBuffer.splice(0, this.batchSize);
+            if (batch.length > 0) {
+                await this.batchSaveToDatabase(batch);
+                logger.debug(`Batch processed: ${batch.length} records`);
+            }
+        } catch (error) {
+            logger.error('Error processing batch:', error);
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+
+    async batchSaveToDatabase(records) {
+        try {
+            // Group records by IMEI for better performance
+            const recordsByImei = new Map();
+            for (const record of records) {
+                const imei = record.deviceImei;
+                if (!recordsByImei.has(imei)) {
+                    recordsByImei.set(imei, []);
+                }
+                recordsByImei.get(imei).push(record);
+            }
+
+            // Process each device's records in parallel
+            const devicePromises = Array.from(recordsByImei.entries()).map(async ([imei, deviceRecords]) => {
+                try {
+                    // Ensure device exists
+                    await this.ensureDeviceExists(imei);
+                    
+                    // Bulk insert records for this device
+                    await Record.bulkCreate(deviceRecords, {
+                        ignoreDuplicates: true,
+                        validate: false
+                    });
+                    
+                    logger.debug(`Bulk saved ${deviceRecords.length} records for device ${imei}`);
+                } catch (error) {
+                    logger.error(`Error bulk saving records for device ${imei}:`, error);
+                    // Fallback to individual saves
+                    for (const record of deviceRecords) {
+                        try {
+                            await Record.create(record);
+                        } catch (individualError) {
+                            logger.error(`Failed to save individual record for ${imei}:`, individualError);
+                        }
+                    }
+                }
+            });
+
+            await Promise.all(devicePromises);
+            logger.info(`Batch save completed: ${records.length} records processed`);
+        } catch (error) {
+            logger.error('Error in batch save to database:', error);
+            throw error;
+        }
+    }
+
+    addRecordToBuffer(recordData) {
+        this.recordBuffer.push(recordData);
+        
+        // Auto-flush if buffer is getting too large
+        if (this.recordBuffer.length >= this.batchSize * 2) {
+            setImmediate(() => this.processBatch());
+        }
+    }
+
+    async flushBuffer() {
+        if (this.recordBuffer.length > 0) {
+            await this.processBatch();
+        }
+    }
     // Method to get IMEI for a specific connection
     getIMEI(connectionAddress) {
         return this.imeiByConnection.get(connectionAddress) || null;
@@ -1254,66 +1354,6 @@ class GalileoskyParser extends EventEmitter {
                 throw new Error(`Invalid IMEI value: ${imei}`);
             }
 
-            // Ensure device exists before saving record
-            await this.ensureDeviceExists(imei);
-
-            // Debug: Log the record tags
-            logger.info('Record tags for debugging:', {
-                imei,
-                tagCount: Object.keys(record.tags).length,
-                tags: Object.keys(record.tags),
-                timestamp: new Date().toISOString()
-            });
-
-            // Debug: Log specific field values
-            logger.info('Field values for debugging:', {
-                imei,
-                inputStates: {
-                    input0: record.tags['0x46']?.value?.states.input0,
-                    input1: record.tags['0x46']?.value?.states.input1,
-                    input2: record.tags['0x46']?.value?.states.input2,
-                    input3: record.tags['0x46']?.value?.states.input3
-                },
-                inputVoltages: {
-                    '0x50': record.tags['0x50']?.value,
-                    '0x51': record.tags['0x51']?.value,
-                    '0x52': record.tags['0x52']?.value,
-                    '0x53': record.tags['0x53']?.value,
-                    '0x54': record.tags['0x54']?.value,
-                    '0x55': record.tags['0x55']?.value,
-                    '0x56': record.tags['0x56']?.value
-                },
-                userData: {
-                    '0xe2': record.tags['0xe2']?.value,
-                    '0xe3': record.tags['0xe3']?.value,
-                    '0xe4': record.tags['0xe4']?.value,
-                    '0xe5': record.tags['0xe5']?.value,
-                    '0xe6': record.tags['0xe6']?.value,
-                    '0xe7': record.tags['0xe7']?.value,
-                    '0xe8': record.tags['0xe8']?.value,
-                    '0xe9': record.tags['0xe9']?.value
-                },
-                modbusData: {
-                    '0x0001': record.tags['0x0001']?.value,
-                    '0x0002': record.tags['0x0002']?.value,
-                    '0x0003': record.tags['0x0003']?.value,
-                    '0x0004': record.tags['0x0004']?.value,
-                    '0x0005': record.tags['0x0005']?.value,
-                    '0x0006': record.tags['0x0006']?.value,
-                    '0x0007': record.tags['0x0007']?.value,
-                    '0x0008': record.tags['0x0008']?.value,
-                    '0x0009': record.tags['0x0009']?.value,
-                    '0x000a': record.tags['0x000a']?.value,
-                    '0x000b': record.tags['0x000b']?.value,
-                    '0x000c': record.tags['0x000c']?.value,
-                    '0x000d': record.tags['0x000d']?.value,
-                    '0x000e': record.tags['0x000e']?.value,
-                    '0x000f': record.tags['0x000f']?.value,
-                    '0x0010': record.tags['0x0010']?.value
-                },
-                timestamp: new Date().toISOString()
-            });
-
             // Extract input states from the inputs tag
             const inputsTag = record.tags['0x46'];
             const inputStates = inputsTag?.value?.states || {};
@@ -1334,7 +1374,7 @@ class GalileoskyParser extends EventEmitter {
                 coordinateCorrectness: record.tags['0x30']?.value?.correctness,
                 speed: record.tags['0x33']?.value?.speed,
                 direction: record.tags['0x33']?.value?.direction,
-                height: record.tags['0x34']?.value,
+                altitude: record.tags['0x34']?.value,
                 hdop: record.tags['0x35']?.value,
                 status: record.tags['0x40']?.value,
                 supplyVoltage: record.tags['0x41']?.value,
@@ -1360,38 +1400,40 @@ class GalileoskyParser extends EventEmitter {
                 inputVoltage5: record.tags['0x55']?.value,
                 inputVoltage6: record.tags['0x56']?.value,
                 // User data
-                userData0: record.tags['0xe2']?.value?.toString(),
-                userData1: record.tags['0xe3']?.value?.toString(),
-                userData2: record.tags['0xe4']?.value?.toString(),
-                userData3: record.tags['0xe5']?.value?.toString(),
-                userData4: record.tags['0xe6']?.value?.toString(),
-                userData5: record.tags['0xe7']?.value?.toString(),
-                userData6: record.tags['0xe8']?.value?.toString(),
-                userData7: record.tags['0xe9']?.value?.toString(),
+                userData0: record.tags['0xe2']?.value?.toString() || null,
+                userData1: record.tags['0xe3']?.value?.toString() || null,
+                userData2: record.tags['0xe4']?.value?.toString() || null,
+                userData3: record.tags['0xe5']?.value?.toString() || null,
+                userData4: record.tags['0xe6']?.value?.toString() || null,
+                userData5: record.tags['0xe7']?.value?.toString() || null,
+                userData6: record.tags['0xe8']?.value?.toString() || null,
+                userData7: record.tags['0xe9']?.value?.toString() || null,
                 // Modbus data
-                modbus0: record.tags['0x0001']?.value?.toString(),
-                modbus1: record.tags['0x0002']?.value?.toString(),
-                modbus2: record.tags['0x0003']?.value?.toString(),
-                modbus3: record.tags['0x0004']?.value?.toString(),
-                modbus4: record.tags['0x0005']?.value?.toString(),
-                modbus5: record.tags['0x0006']?.value?.toString(),
-                modbus6: record.tags['0x0007']?.value?.toString(),
-                modbus7: record.tags['0x0008']?.value?.toString(),
-                modbus8: record.tags['0x0009']?.value?.toString(),
-                modbus9: record.tags['0x000a']?.value?.toString(),
-                modbus10: record.tags['0x000b']?.value?.toString(),
-                modbus11: record.tags['0x000c']?.value?.toString(),
-                modbus12: record.tags['0x000d']?.value?.toString(),
-                modbus13: record.tags['0x000e']?.value?.toString(),
-                modbus14: record.tags['0x000f']?.value?.toString(),
-                modbus15: record.tags['0x0010']?.value?.toString(),
+                modbus0: record.tags['0x0001']?.value?.toString() || null,
+                modbus1: record.tags['0x0002']?.value?.toString() || null,
+                modbus2: record.tags['0x0003']?.value?.toString() || null,
+                modbus3: record.tags['0x0004']?.value?.toString() || null,
+                modbus4: record.tags['0x0005']?.value?.toString() || null,
+                modbus5: record.tags['0x0006']?.value?.toString() || null,
+                modbus6: record.tags['0x0007']?.value?.toString() || null,
+                modbus7: record.tags['0x0008']?.value?.toString() || null,
+                modbus8: record.tags['0x0009']?.value?.toString() || null,
+                modbus9: record.tags['0x000a']?.value?.toString() || null,
+                modbus10: record.tags['0x000b']?.value?.toString() || null,
+                modbus11: record.tags['0x000c']?.value?.toString() || null,
+                modbus12: record.tags['0x000d']?.value?.toString() || null,
+                modbus13: record.tags['0x000e']?.value?.toString() || null,
+                modbus14: record.tags['0x000f']?.value?.toString() || null,
+                modbus15: record.tags['0x0010']?.value?.toString() || null,
                 rawData: JSON.stringify(record.tags)
             };
 
-            await Record.create(recordData);
-            logger.info(`Record saved for device ${imei} with ${Object.keys(record.tags).length} tags`);
+            // Add to batch buffer instead of saving immediately
+            this.addRecordToBuffer(recordData);
+            
+            logger.debug(`Record queued for batch processing: device ${imei} with ${Object.keys(record.tags).length} tags`);
         } catch (error) {
-            logger.error(`Error saving record to database: ${error.message}`);
+            logger.error(`Error preparing record for batch processing: ${error.message}`);
             throw error;
         }
     }
@@ -1407,39 +1449,60 @@ class GalileoskyParser extends EventEmitter {
             recordOffset++;
 
             if (tag === 0xFE) {
-                // Extended tags not implemented in this fix
-                break;
-            }
+                // Handle extended tags (2-byte tags)
+                if (recordOffset < endOffset - 1) {
+                    const extendedTag = buffer.readUInt8(recordOffset);
+                    recordOffset++;
+                    const tagHex = `0x${tag.toString(16).padStart(2, '0')}${extendedTag.toString(16).padStart(2, '0')}`;
+                    const { value, newOffset, definition } = this.parseTagValue(buffer, recordOffset, tagHex);
 
-            const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
-            const { value, newOffset, definition } = this.parseTagValue(buffer, recordOffset, tagHex);
+                    if (value !== null && definition) {
+                        record.tags[tagHex] = {
+                            value: value,
+                            type: definition.type,
+                            description: definition.description
+                        };
+                        parsedTags.push(tagHex);
+                    }
 
-            if (value !== null && definition) {
-                record.tags[tagHex] = {
-                    value: value,
-                    type: definition.type,
-                    description: definition.description
-                };
-                parsedTags.push(tagHex);
+                    // Advance offset by the correct value length (from parseTagValue)
+                    recordOffset = newOffset;
+                } else {
+                    // Not enough bytes for extended tag
+                    break;
+                }
+            } else {
+                // Handle regular 1-byte tags
+                const tagHex = `0x${tag.toString(16).padStart(2, '0')}`;
+                const { value, newOffset, definition } = this.parseTagValue(buffer, recordOffset, tagHex);
 
-                // Extract IMEI from tag 0x03 (like original implementation)
-                if (tagHex === '0x03' && definition.type === 'string' && value && connectionAddress) {
-                    // Additional validation for IMEI
-                    if (typeof value === 'string' && /^\d{15}$/.test(value)) {
-                        this.setIMEI(connectionAddress, value);
-                    } else {
-                        logger.warn(`Invalid IMEI value, not storing: ${value}`, {
-                            type: typeof value,
-                            length: value ? value.length : 0,
-                            connectionAddress,
-                            timestamp: new Date().toISOString()
-                        });
+                if (value !== null && definition) {
+                    record.tags[tagHex] = {
+                        value: value,
+                        type: definition.type,
+                        description: definition.description
+                    };
+                    parsedTags.push(tagHex);
+
+                    // Extract IMEI from tag 0x03 (like original implementation)
+                    if (tagHex === '0x03' && definition.type === 'string' && value && connectionAddress) {
+                        // Additional validation for IMEI
+                        if (typeof value === 'string' && /^\d{15}$/.test(value)) {
+                            this.setIMEI(connectionAddress, value);
+                        } else {
+                            logger.warn(`Invalid IMEI value, not storing: ${value}`, {
+                                type: typeof value,
+                                length: value ? value.length : 0,
+                                connectionAddress,
+                                timestamp: new Date().toISOString()
+                            });
+                        }
                     }
                 }
-            }
 
-            // Advance offset by the correct value length (from parseTagValue)
-            recordOffset = newOffset;
+                // Advance offset by the correct value length (from parseTagValue)
+                recordOffset = newOffset;
+            }
         }
 
         // Log the parsed tags for debugging
@@ -1470,3 +1533,7 @@ class GalileoskyParser extends EventEmitter {
 
 // Export the class
 module.exports = GalileoskyParser;
+
+
+
+

@@ -42,7 +42,9 @@ import {
   Satellite as SatelliteIcon,
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
-  People as PeopleIcon
+  People as PeopleIcon,
+  Group as GroupIcon,
+  Security as SecurityIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
@@ -102,6 +104,14 @@ const Layout = ({ children }) => {
       permission: 'devices'
     },
     { 
+      text: 'Device Groups', 
+      icon: <GroupIcon />, 
+      path: '/device-groups',
+      description: 'Organize devices into groups',
+      permission: 'device-groups',
+      adminOnly: true
+    },
+    { 
       text: 'Mapping', 
       icon: <MapIcon />, 
       path: '/mapping',
@@ -114,6 +124,14 @@ const Layout = ({ children }) => {
       path: '/tracking',
       description: 'Real-time location tracking',
       permission: 'tracking'
+    },
+    {
+      text: 'Multi Tracking',
+      icon: <MapIcon />,
+      path: '/multi-tracking',
+      description: 'Multi-device location tracking',
+      permission: 'multi-tracking',
+      adminOnly: false
     },
     { 
       text: 'Data Table', 
@@ -146,11 +164,26 @@ const Layout = ({ children }) => {
       adminOnly: true
     },
     { 
+      text: 'Role Management', 
+      icon: <SecurityIcon />, 
+      path: '/role-management',
+      description: 'Manage roles and permissions',
+      permission: 'user-management',
+      adminOnly: true
+    },
+    { 
       text: 'Data Export', 
       icon: <TableChartIcon />, 
       path: '/export',
       description: 'Export data and reports',
       permission: 'export'
+    },
+    { 
+      text: 'Data SM', 
+      icon: <ScienceIcon />, 
+      path: '/data-sm',
+      description: 'Sensor monitoring data export',
+      permission: 'data-sm'
     },
     { 
       text: 'Offline Demo', 
@@ -163,15 +196,33 @@ const Layout = ({ children }) => {
 
   // Filter menu items based on user permissions
   const filteredMenuItems = menuItems.filter(item => {
-    // Admin can see everything
-    if (user?.role === 'admin') return true;
+    // Admin has access to everything
+    if (user?.role === 'admin') {
+      return true;
+    }
     
-    // Check adminOnly items
-    if (item.adminOnly) return false;
+    // Check admin-only items
+    if (item.adminOnly && user?.role !== 'admin') {
+      return false;
+    }
     
-    // Check specific menu permissions
-    if (item.permission) {
-      return hasMenuAccess(item.permission);
+    // Check menu access permissions for non-admin users
+    if (item.permission && user?.role !== 'admin') {
+      // Handle different permission structures
+      if (user?.permissions?.menus) {
+        if (typeof user.permissions.menus === 'object') {
+          // New structure: permissions.menus[menuName].access
+          return user.permissions.menus[item.permission]?.access === true;
+        } else if (Array.isArray(user.permissions.menus)) {
+          // Old structure: permissions.menus array
+          return user.permissions.menus.includes(item.permission);
+        }
+      }
+      
+      // Fallback: check if menu name is in permissions array (legacy)
+      if (Array.isArray(user?.permissions)) {
+        return user.permissions.includes(item.permission);
+      }
     }
     
     return true;

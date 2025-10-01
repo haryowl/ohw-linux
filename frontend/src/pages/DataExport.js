@@ -43,6 +43,10 @@ const DataExport = () => {
     longitude: true,
     speed: true,
     direction: true,
+    altitude: true, // Add altitude field
+    course: true, // Add course field
+    satellites: true, // Add satellites field
+    hdop: true, // Add hdop field
     status: true,
     supplyVoltage: true,
     batteryVoltage: true,
@@ -89,7 +93,7 @@ const DataExport = () => {
   const [imeiLoading, setImeiLoading] = useState(false);
 
   const fieldGroups = {
-    'Basic Information': ['timestamp', 'datetime', 'deviceImei', 'recordNumber', 'latitude', 'longitude', 'speed', 'direction', 'status'],
+    'Basic Information': ['timestamp', 'datetime', 'deviceImei', 'recordNumber', 'latitude', 'longitude', 'speed', 'direction', 'altitude', 'course', 'satellites', 'hdop', 'status'],
     'Power Information': ['supplyVoltage', 'batteryVoltage'],
     'Input States': ['input0', 'input1', 'input2', 'input3'],
     'Input Voltages': ['inputVoltage0', 'inputVoltage1', 'inputVoltage2', 'inputVoltage3', 'inputVoltage4', 'inputVoltage5', 'inputVoltage6'],

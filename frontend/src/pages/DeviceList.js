@@ -16,24 +16,39 @@ import {
   CircularProgress,
   Alert,
   IconButton,
-  Tooltip
+  Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+  Grid
 } from '@mui/material';
 import { 
   LocationOn as LocationIcon, 
   Refresh as RefreshIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  Group as GroupIcon,
+  FilterList as FilterIcon,
+  Clear as ClearIcon
 } from '@mui/icons-material';
 import useWebSocket from '../hooks/useWebSocket';
-import { apiFetchDevices } from '../services/api';
+import { apiFetchDevices, apiFetchDeviceGroups } from '../services/api';
 import DeviceEditDialog from '../components/DeviceEditDialog';
 
 const DeviceList = () => {
   const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState(null);
+  
+  // Filter states
+  const [groupFilter, setGroupFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // WebSocket connection for real-time updates
   const handleWebSocketMessage = useCallback((message) => {
@@ -82,20 +97,28 @@ const DeviceList = () => {
 
   const ws = useWebSocket(null, handleWebSocketMessage);
 
-  // Fetch devices from API
-  const fetchDevices = async () => {
+  // Fetch devices and groups from API
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiFetchDevices();
-      if (response.success) {
-        setDevices(response.data || []);
+      const [devicesResponse, groupsResponse] = await Promise.all([
+        apiFetchDevices(),
+        apiFetchDeviceGroups()
+      ]);
+      
+      if (devicesResponse.success) {
+        setDevices(devicesResponse.data || []);
       } else {
-        setError(response.message || 'Failed to fetch devices');
+        setError(devicesResponse.message || 'Failed to fetch devices');
+      }
+      
+      if (groupsResponse) {
+        setGroups(groupsResponse);
       }
     } catch (err) {
-      console.error('Error fetching devices:', err);
-      setError('Failed to fetch devices');
+      console.error('Error fetching data:', err);
+      setError('Failed to fetch data');
     } finally {
       setLoading(false);
     }
@@ -103,10 +126,40 @@ const DeviceList = () => {
 
   // Initial fetch
   useEffect(() => {
-    fetchDevices();
+    fetchData();
   }, []);
 
+  // Filter devices based on current filters
+  const filteredDevices = devices.filter(device => {
+    const matchesGroup = !groupFilter || device.groupId === parseInt(groupFilter);
+    const matchesStatus = !statusFilter || device.status === statusFilter;
+    const matchesSearch = !searchTerm || 
+      device.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      device.imei?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesGroup && matchesStatus && matchesSearch;
+  });
 
+  // Get group name by ID
+  const getGroupName = (groupId) => {
+    if (!groupId) return null;
+    const group = groups.find(g => g.id === groupId);
+    return group ? group.name : null;
+  };
+
+  // Get group color by ID
+  const getGroupColor = (groupId) => {
+    if (!groupId) return null;
+    const group = groups.find(g => g.id === groupId);
+    return group ? group.color : null;
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setGroupFilter('');
+    setStatusFilter('');
+    setSearchTerm('');
+  };
 
   const handleDeviceClick = (deviceId) => {
     navigate(`/devices/${deviceId}`);
@@ -114,6 +167,10 @@ const DeviceList = () => {
 
   const handleTrackingClick = () => {
     navigate('/tracking');
+  };
+
+  const handleGroupManagementClick = () => {
+    navigate('/device-groups');
   };
 
   const handleEditDevice = (device) => {
@@ -178,8 +235,16 @@ const DeviceList = () => {
         <Box>
           <Button
             variant="outlined"
+            startIcon={<GroupIcon />}
+            onClick={handleGroupManagementClick}
+            sx={{ mr: 2 }}
+          >
+            Manage Groups
+          </Button>
+          <Button
+            variant="outlined"
             startIcon={<RefreshIcon />}
-            onClick={fetchDevices}
+            onClick={fetchData}
             sx={{ mr: 2 }}
           >
             Refresh
@@ -194,6 +259,82 @@ const DeviceList = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Filters */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box display="flex" alignItems="center" mb={2}>
+          <FilterIcon sx={{ mr: 1 }} />
+          <Typography variant="h6">Filters</Typography>
+        </Box>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              fullWidth
+              label="Search devices"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by name or IMEI..."
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <FormControl fullWidth>
+              <InputLabel>Group</InputLabel>
+              <Select
+                value={groupFilter}
+                onChange={(e) => setGroupFilter(e.target.value)}
+                label="Group"
+              >
+                <MenuItem value="">All Groups</MenuItem>
+                {groups.map((group) => (
+                  <MenuItem key={group.id} value={group.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box
+                        sx={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          backgroundColor: group.color,
+                          mr: 1
+                        }}
+                      />
+                      {group.name}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <FormControl fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                label="Status"
+              >
+                <MenuItem value="">All Status</MenuItem>
+                <MenuItem value="Active">Active</MenuItem>
+                <MenuItem value="Inactive">Inactive</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Button
+              variant="outlined"
+              startIcon={<ClearIcon />}
+              onClick={clearFilters}
+              fullWidth
+            >
+              Clear Filters
+            </Button>
+          </Grid>
+        </Grid>
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Showing {filteredDevices.length} of {devices.length} devices
+          </Typography>
+        </Box>
+      </Paper>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -213,6 +354,7 @@ const DeviceList = () => {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>IMEI</TableCell>
+              <TableCell>Group</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Last Seen</TableCell>
               <TableCell>Custom Fields</TableCell>
@@ -220,16 +362,16 @@ const DeviceList = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {devices.length === 0 ? (
+            {filteredDevices.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <Typography variant="body1" color="textSecondary">
-                    No devices found
+                    {devices.length === 0 ? 'No devices found' : 'No devices match the current filters'}
                   </Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              devices.map((device) => (
+              filteredDevices.map((device) => (
                 <TableRow key={device.id || device.imei}>
                   <TableCell>
                     <Typography variant="body1" fontWeight="medium">
@@ -240,6 +382,26 @@ const DeviceList = () => {
                     <Typography variant="body2" fontFamily="monospace">
                       {device.imei}
                     </Typography>
+                  </TableCell>
+                  <TableCell>
+                    {device.groupId ? (
+                      <Chip
+                        icon={<GroupIcon />}
+                        label={getGroupName(device.groupId)}
+                        size="small"
+                        sx={{
+                          backgroundColor: getGroupColor(device.groupId),
+                          color: 'white',
+                          '& .MuiChip-icon': {
+                            color: 'white'
+                          }
+                        }}
+                      />
+                    ) : (
+                      <Typography variant="body2" color="textSecondary">
+                        No Group
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Chip 

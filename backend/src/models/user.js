@@ -41,6 +41,15 @@ module.exports = (sequelize) => {
       allowNull: false,
       defaultValue: 'viewer'
     },
+    roleId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'roles',
+        key: 'id'
+      },
+      comment: 'Reference to custom role (overrides the role enum)'
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

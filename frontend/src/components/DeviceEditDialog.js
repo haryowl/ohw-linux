@@ -11,28 +11,51 @@ import {
   IconButton,
   Chip,
   Alert,
-  CircularProgress
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
-import { authenticatedFetch } from '../services/api';
+import { Add as AddIcon, Group as GroupIcon } from '@mui/icons-material';
+import { authenticatedFetch, apiFetchDeviceGroups } from '../services/api';
 
 const DeviceEditDialog = ({ open, device, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: '',
+    groupId: null,
     customFields: {}
   });
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [newCustomField, setNewCustomField] = useState({ key: '', value: '' });
+
+  // Load groups when dialog opens
+  useEffect(() => {
+    if (open) {
+      loadGroups();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (device) {
       setFormData({
         name: device.name || '',
+        groupId: device.groupId || null,
         customFields: device.customFields || {}
       });
     }
   }, [device]);
+
+  const loadGroups = async () => {
+    try {
+      const groupsData = await apiFetchDeviceGroups();
+      setGroups(groupsData);
+    } catch (error) {
+      console.error('Error loading groups:', error);
+    }
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -127,6 +150,48 @@ const DeviceEditDialog = ({ open, device, onClose, onSave }) => {
             margin="normal"
             required
           />
+        </Box>
+
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Device Group
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Assign this device to a group for better organization
+          </Typography>
+          <FormControl fullWidth>
+            <InputLabel>Select Group</InputLabel>
+            <Select
+              value={formData.groupId || ''}
+              onChange={(e) => handleInputChange('groupId', e.target.value || null)}
+              label="Select Group"
+            >
+              <MenuItem value="">
+                <em>No Group</em>
+              </MenuItem>
+              {groups.map((group) => (
+                <MenuItem key={group.id} value={group.id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        backgroundColor: group.color,
+                        mr: 1
+                      }}
+                    />
+                    {group.name}
+                    {group.description && (
+                      <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                        ({group.description})
+                      </Typography>
+                    )}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Box>
 
         <Box sx={{ mb: 3 }}>

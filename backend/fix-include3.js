@@ -1,0 +1,1 @@
+const fs = require("fs");let content = fs.readFileSync("src/routes/records.js", "utf8");// Replace the problematic include with an empty stringcontent = content.replace(/include: \[\{[\s\S]*?model: require\('\.\.\/models'\)\.Device[\s\S]*?\}\]/g, "");fs.writeFileSync("src/routes/records.js", content);console.log("Fixed include issue"); 

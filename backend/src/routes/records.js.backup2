@@ -1,0 +1,304 @@
+const express = require('express');
+const router = express.Router();
+const { Record } = require('../models');
+const { Op } = require('sequelize');
+const { Parser: Json2csvParser } = require('json2csv');
+const ExcelJS = require('exceljs');
+
+// Get records with optional date filtering - OPTIMIZED
+router.get('/', async (req, res) => {
+    try {
+        const requestStart = Date.now();
+        console.log('🚀 GET /api/records - Starting request');
+        
+        let { startDate, endDate, limit = 100, range, imeis } = req.query;
+        const where = {};
+        const now = new Date();
+        
+        // Better defaults to prevent massive queries
+        if (!range && !startDate && !endDate) {
+            // Default to last 1h instead of 24h for better performance
+            range = '1h';
+        }
+        
+        if (range === '24h') {
+            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            endDate = now;
+        } else if (range === '1h') {
+            startDate = new Date(now.getTime() - 60 * 60 * 1000);
+            endDate = now;
+        } else if (range === 'all') {
+            // For 'all' requests, limit to last 7 days to prevent timeout
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            endDate = now;
+        }
+        
+        if (startDate && endDate) {
+            where.datetime = {
+                [Op.between]: [new Date(startDate), new Date(endDate)]
+            };
+        }
+        
+        // Add IMEI filtering if provided
+        if (imeis) {
+            const imeiList = imeis.split(',').map(imei => imei.trim()).filter(imei => imei);
+            if (imeiList.length > 0) {
+                where.deviceImei = {
+                    [Op.in]: imeiList
+                };
+            }
+        }
+        
+        // Better limit handling to prevent massive queries
+        let queryLimit = parseInt(limit);
+        if (limit === 'all' || queryLimit === 0 || isNaN(queryLimit)) {
+            // Cap at 1000 records for 'all' requests to prevent timeout
+            queryLimit = 1000;
+        } else if (queryLimit > 1000) {
+            // Cap at 1000 records maximum
+            queryLimit = 1000;
+        }
+        
+        console.log(`📊 Records query: ${range || 'custom'} range, limit: ${queryLimit}`);
+        const dbStart = Date.now();
+        
+        const records = await Record.findAll({
+            where,
+            order: [['datetime', 'DESC']],
+            limit: queryLimit,
+            // Add attributes to reduce data transfer - include important GPS fields and timestamp
+            attributes: ['id', 'deviceImei', 'timestamp', 'datetime', 'latitude', 'longitude', 'altitude', 'speed', 'course', 'satellites', 'hdop', 'direction', 'status', 'supplyVoltage', 'batteryVoltage', 'forwarded', 'userData0', 'userData1', 'userData2', 'modbus0']
+        });
+        
+        const dbTime = Date.now() - dbStart;
+        const totalTime = Date.now() - requestStart;
+        
+        console.log(`✅ Records query completed in ${dbTime}ms - Found ${records.length} records`);
+        console.log(`✅ Total request time: ${totalTime}ms`);
+        
+        res.json(records);
+    } catch (error) {
+        console.error('❌ Error fetching records:', error);
+        res.status(500).json({ 
+            error: 'Failed to fetch records', 
+            details: error.message, 
+            stack: error.stack 
+        });
+    }
+});
+
+// Get available IMEIs for export filtering
+router.get('/imeis', async (req, res) => {
+    try {
+        // Use a simpler approach to get distinct IMEIs
+        const records = await Record.findAll({
+            attributes: ['deviceImei'],
+            group: ['deviceImei'],
+            raw: true
+        });
+        
+        const imeiList = records
+            .map(item => item.deviceImei)
+            .filter(imei => imei && imei.trim() !== '')
+            .sort();
+            
+        res.json(imeiList);
+    } catch (error) {
+        console.error('Error fetching IMEIs:', error);
+        res.status(500).json({ 
+            error: 'Failed to fetch IMEIs',
+            details: error.message 
+        });
+    }
+});
+
+// Export records
+router.post('/export', async (req, res) => {
+    try {
+        const { startDate, endDate, format, fields, imeis } = req.body;
+        const where = {};
+        
+        // Use DATETIME field for time filtering instead of TIMESTAMP
+        if (startDate && endDate) {
+            where.datetime = {
+                [Op.between]: [new Date(startDate), new Date(endDate)]
+            };
+        }
+        
+        // Add IMEI filtering if provided
+        if (imeis && imeis.length > 0) {
+            where.deviceImei = {
+                [Op.in]: imeis
+            };
+        }
+        
+        // Include all possible fields in the query to ensure they're available for export
+        const allFields = [
+            'id', 'deviceImei', 'timestamp', 'datetime', 'recordNumber',
+            'latitude', 'longitude', 'speed', 'direction', 'altitude', 'course', 'satellites', 'hdop',
+            'status', 'supplyVoltage', 'batteryVoltage',
+            'input0', 'input1', 'input2', 'input3',
+            'inputVoltage0', 'inputVoltage1', 'inputVoltage2', 'inputVoltage3', 'inputVoltage4', 'inputVoltage5', 'inputVoltage6',
+            'userData0', 'userData1', 'userData2', 'userData3', 'userData4', 'userData5', 'userData6', 'userData7',
+            'modbus0', 'modbus1', 'modbus2', 'modbus3', 'modbus4', 'modbus5', 'modbus6', 'modbus7',
+            'modbus8', 'modbus9', 'modbus10', 'modbus11', 'modbus12', 'modbus13', 'modbus14', 'modbus15'
+        ];
+        
+        const records = await Record.findAll({
+            where,
+            attributes: allFields,
+            order: [['datetime', 'DESC']] // Order by device datetime instead of server timestamp
+        });
+        
+        const data = records.map(r => r.toJSON());
+        const selectedData = data.map(row => {
+            const filtered = {};
+            fields.forEach(f => {
+                // Handle timestamp field - use datetime if timestamp is null
+                if (f === 'timestamp' && (row[f] === null || row[f] === undefined)) {
+                    filtered[f] = row['datetime'] || 'N/A';
+                } else {
+                    filtered[f] = row[f] || 'N/A';
+                }
+            });
+            return filtered;
+        });
+        
+        if (format === 'csv') {
+            const parser = new Json2csvParser({ fields });
+            const csv = parser.parse(selectedData);
+            res.header('Content-Type', 'text/csv');
+            res.attachment('data-export.csv');
+            return res.send(csv);
+        } else if (format === 'json') {
+            res.header('Content-Type', 'application/json');
+            res.attachment('data-export.json');
+            return res.send(JSON.stringify(selectedData, null, 2));
+        } else if (format === 'xlsx') {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Export');
+            worksheet.columns = fields.map(f => ({ header: f, key: f }));
+            worksheet.addRows(selectedData);
+            res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.attachment('data-export.xlsx');
+            await workbook.xlsx.write(res);
+            return res.end();
+        } else {
+            return res.status(400).json({ error: 'Invalid export format' });
+        }
+    } catch (error) {
+        console.error('Error exporting records:', error);
+        res.status(500).json({ error: 'Failed to export records' });
+    }
+});
+
+// Export Data SM records with custom field mapping
+router.post('/export-sm', requireAuth, filterDevicesByPermission, async (req, res) => {
+    try {
+        const { startDate, endDate, fields, customHeaders, imeis, fileExtension = 'pfsl' } = req.body;
+        const where = {};
+        
+        // Use DATETIME field for time filtering
+        if (startDate && endDate) {
+            where.datetime = {
+                [Op.between]: [new Date(startDate), new Date(endDate)]
+            };
+        }
+        
+        // Add IMEI filtering if provided
+        if (imeis && imeis.length > 0) {
+            where.deviceImei = {
+                [Op.in]: imeis
+            };
+        }
+        
+        // Include all required fields for Data SM
+        const allFields = [
+            'id', 'deviceImei', 'datetime', 'latitude', 'longitude', 'speed', 'altitude', 'satellites',
+            'userData0', 'userData1', 'userData2', 'modbus0'
+        ];
+        
+        const records = await Record.findAll({
+            where,
+            attributes: allFields,
+            order: [['datetime', 'DESC']],
+            
+        });
+        
+        // Transform data with custom headers and device names
+        const transformedData = records.map(record => {
+            const transformed = {};
+            
+            // Get device name - try multiple approaches
+            let deviceName = record.deviceImei; // fallback to IMEI
+            if (record.device && record.device.name) {
+                deviceName = record.device.name;
+            } else if (record.device && record.device.dataValues && record.device.dataValues.name) {
+                deviceName = record.device.dataValues.name;
+            }
+            
+            // Map each field to its custom header
+            Object.keys(customHeaders).forEach(field => {
+                switch (field) {
+                    case 'deviceName':
+                        transformed[customHeaders[field]] = deviceName;
+                        break;
+                    case 'deviceImei':
+                        transformed[customHeaders[field]] = record.deviceImei;
+                        break;
+                    case 'datetime':
+                        transformed[customHeaders[field]] = record.datetime ? 
+                            new Date(record.datetime).toLocaleString() : 'N/A';
+                        break;
+                    case 'latitude':
+                        transformed[customHeaders[field]] = record.latitude || 'N/A';
+                        break;
+                    case 'longitude':
+                        transformed[customHeaders[field]] = record.longitude || 'N/A';
+                        break;
+                    case 'speed':
+                        transformed[customHeaders[field]] = record.speed === null || record.speed === undefined ? 'N/A' : record.speed;
+                        break;
+                    case 'altitude':
+                        transformed[customHeaders[field]] = record.altitude === null || record.altitude === undefined ? 'N/A' : record.altitude;
+                        break;
+                    case 'satellites':
+                        transformed[customHeaders[field]] = record.satellites === null || record.satellites === undefined ? 'N/A' : record.satellites;
+                        break;
+                    case 'userData0':
+                        transformed[customHeaders[field]] = record.userData0 === null || record.userData0 === undefined ? 'N/A' : record.userData0;
+                        break;
+                    case 'userData1':
+                        transformed[customHeaders[field]] = record.userData1 === null || record.userData1 === undefined ? 'N/A' : record.userData1;
+                        break;
+                    case 'modbus0':
+                        transformed[customHeaders[field]] = record.modbus0 === null || record.modbus0 === undefined ? 'N/A' : record.modbus0;
+                        break;
+                    case 'userData2':
+                        transformed[customHeaders[field]] = record.userData2 === null || record.userData2 === undefined ? 'N/A' : record.userData2;
+                        break;
+                    default:
+                        transformed[customHeaders[field]] = record[field] === null || record[field] === undefined ? 'N/A' : record[field];
+                }
+            });
+            return transformed;
+        });
+        
+        // Generate CSV with custom headers
+        const parser = new Json2csvParser({ 
+            fields: Object.values(customHeaders),
+            header: true
+        });
+        const csv = parser.parse(transformedData);
+        
+        res.header('Content-Type', 'text/csv');
+        res.attachment(`data_sm_export.${fileExtension}`);
+        return res.send(csv);
+        
+    } catch (error) {
+        console.error('Error exporting Data SM records:', error);
+        res.status(500).json({ error: 'Failed to export Data SM records' });
+    }
+});
+
+module.exports = router; 

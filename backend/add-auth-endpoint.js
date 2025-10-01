@@ -1,0 +1,1 @@
+const fs = require("fs");let content = fs.readFileSync("src/routes/records.js", "utf8");content = content.replace("router.post('/export-sm', async (req, res) => {", "router.post('/export-sm', requireAuth, filterDevicesByPermission, async (req, res) => {");fs.writeFileSync("src/routes/records.js", content);console.log("Added authentication to export-sm"); 

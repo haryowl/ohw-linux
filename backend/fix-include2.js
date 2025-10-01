@@ -1,0 +1,1 @@
+const fs = require("fs");let content = fs.readFileSync("src/routes/records.js", "utf8");// Remove the specific problematic include blockcontent = content.replace(/include: \[\{[\s\S]*?model: require\('\.\.\/models'\)\.Device[\s\S]*?\}\]/g, "");fs.writeFileSync("src/routes/records.js", content);console.log("Removed Device include"); 
