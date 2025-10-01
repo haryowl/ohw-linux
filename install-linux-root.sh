@@ -129,7 +129,7 @@ fi
 # Run the deployment script
 echo -e "${YELLOW}🚀 Running deployment...${NC}"
 chmod +x deploy-linux.sh
-./deploy-linux.sh
+./deploy-linux-root.sh
 
 echo -e "${GREEN}🎉 Installation completed successfully!${NC}"
 echo -e "${BLUE}📋 Access your application:${NC}"
