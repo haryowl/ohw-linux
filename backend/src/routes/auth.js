@@ -25,7 +25,7 @@ router.post('/login', async (req, res) => {
         // Find user
         const user = await User.findOne({ 
             where: { username, isActive: true },
-            attributes: ['id', 'username', 'password', 'firstName', 'lastName', 'role', 'roleId', 'permissions'],
+            attributes: ['id', 'username', 'password', 'firstName', 'lastName', 'role', 'roleId', 'permissions', 'isActive'],
             include: [
                 {
                     model: require('../models').Role,
