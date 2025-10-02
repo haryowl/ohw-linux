@@ -14,12 +14,14 @@ const defineUserDeviceAccess = require('./userDeviceAccess');
 const defineUserDeviceGroupAccess = require('./userDeviceGroupAccess');
 const defineRole = require('./role');
 
+const path = require('path');
+
 // Database configuration
 const dbConfig = {
     dialect: 'sqlite',
     storage: process.env.NODE_ENV === 'production' 
-        ? './data/prod.sqlite' 
-        : './data/dev.sqlite',
+        ? path.join(__dirname, '..', '..', 'data', 'prod.sqlite')
+        : path.join(__dirname, '..', '..', 'data', 'dev.sqlite'),
     logging: msg => logger.debug(msg)
 };
 
