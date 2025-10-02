@@ -24,7 +24,7 @@ router.post('/login', async (req, res) => {
         
         // Find user
         const user = await User.findOne({ 
-            where: { username, isActive: true },
+            where: { username},
             attributes: ['id', 'username', 'password', 'firstName', 'lastName', 'role', 'roleId', 'permissions', 'isActive'],
             include: [
                 {
@@ -36,7 +36,7 @@ router.post('/login', async (req, res) => {
             ]
         });
         
-        if (!user) {
+        if (!user || !user.isActive) {
             return res.status(401).json({ 
                 error: 'Invalid username or password' 
             });
