@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Gali-Parse Linux Deployment Script (Root Version)
+# Gali-Parse Linux Deployment Script (Root Version) - FIXED
 set -e
 
 # Colors
@@ -47,6 +47,12 @@ CONFIG_DIR=backend/data
 LOG_LEVEL=info
 LOG_FILE=logs/app.log
 EOF
+
+echo -e "${BLUE}📋 Initializing Database${NC}"
+cd backend
+NODE_ENV=production node init-database.js
+NODE_ENV=production node create-default-admin.js
+cd ..
 
 echo -e "${BLUE}📋 Creating PM2 Config${NC}"
 cat > ecosystem.config.js << 'EOF'
@@ -116,3 +122,7 @@ echo -e "${GREEN}🎉 Deployment Completed!${NC}"
 echo "Application: http://localhost"
 echo "PM2 Status: pm2 status"
 echo "Logs: pm2 logs gali-parse"
+echo ""
+echo -e "${GREEN}🔐 Default Admin Credentials:${NC}"
+echo "Username: admin"
+echo "Password: admin123"

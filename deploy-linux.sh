@@ -76,6 +76,12 @@ module.exports = {
 };
 EOF
 
+echo -e "${BLUE}📋 Initializing Database${NC}"
+cd backend
+NODE_ENV=production node init-database.js
+NODE_ENV=production node create-default-admin.js
+cd ..
+
 echo -e "${BLUE}📋 Starting Application${NC}"
 pm2 start ecosystem.config.js
 pm2 save
