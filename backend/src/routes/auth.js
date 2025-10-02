@@ -16,39 +16,57 @@ router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         
+        logger.info('Login attempt', { username, hasPassword: !!password });
+        
         if (!username || !password) {
+            logger.warn('Login failed - missing credentials', { username, hasPassword: !!password });
             return res.status(400).json({ 
                 error: 'Username and password are required' 
             });
         }
         
-        // Find user
+        // Find user - SIMPLIFIED QUERY
         const user = await User.findOne({ 
-            where: { username},
-            attributes: ['id', 'username', 'password', 'firstName', 'lastName', 'role', 'roleId', 'permissions', 'isActive'],
-            include: [
-                {
-                    model: require('../models').Role,
-                    as: 'userRole',
-                    attributes: ['id', 'name', 'description', 'permissions'],
-                    required: false
-                }
-            ]
+            where: { username: username },
+            attributes: ['id', 'username', 'password', 'firstName', 'lastName', 'role', 'roleId', 'permissions', 'isActive']
         });
         
-        if (!user || !user.isActive) {
+        logger.info('User lookup result', { 
+            found: !!user, 
+            username: user?.username,
+            isActive: user?.isActive,
+            role: user?.role
+        });
+        
+        if (!user) {
+            logger.warn('Login failed - user not found', { username });
+            return res.status(401).json({ 
+                error: 'Invalid username or password' 
+            });
+        }
+        
+        // Check if user is active - HANDLE BOTH BOOLEAN AND INTEGER
+        const isActive = user.isActive === true || user.isActive === 1 || user.isActive === '1';
+        if (!isActive) {
+            logger.warn('Login failed - user inactive', { username, isActive: user.isActive });
             return res.status(401).json({ 
                 error: 'Invalid username or password' 
             });
         }
         
         // Check password
+        logger.info('Checking password for user', { username });
         const isValidPassword = await user.comparePassword(password);
+        logger.info('Password check result', { username, isValid: isValidPassword });
+        
         if (!isValidPassword) {
+            logger.warn('Login failed - invalid password', { username });
             return res.status(401).json({ 
                 error: 'Invalid username or password' 
             });
         }
+        
+        logger.info('Login successful', { username, userId: user.id });
         
         // Clear any existing sessions for this user
         await sessionStore.deleteByUserId(user.id);
@@ -59,9 +77,12 @@ router.post('/login', async (req, res) => {
         let effectiveRole = user.role;
         
         // If user has a custom role, use the custom role's permissions
-        if (user.roleId && user.userRole) {
-            effectivePermissions = user.userRole.permissions;
-            effectiveRole = user.userRole.name;
+        if (user.roleId) {
+            const customRole = await require('../models').Role.findByPk(user.roleId);
+            if (customRole) {
+                effectivePermissions = customRole.permissions;
+                effectiveRole = customRole.name;
+            }
         }
         
         // Generate session token
